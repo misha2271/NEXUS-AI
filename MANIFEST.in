@@ -1,0 +1,8 @@
+include .gitignore
+include Build-Windows.cmd
+graft .github
+graft packaging
+graft scripts
+graft docs
+recursive-include tests *.py
+global-exclude __pycache__ *.py[cod]

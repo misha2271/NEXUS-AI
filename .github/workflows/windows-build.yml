@@ -1,0 +1,90 @@
+name: Windows executable builds
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Windows x64 / onefile and onedir
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: x64
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install build and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,nvidia,freeze]"
+      - name: Lint and check formatting
+        run: |
+          python -m ruff check .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m ruff format --check .
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
+      - name: Build and smoke-test both Windows executables
+        run: python scripts/build_windows.py --mode both
+      - name: Archive complete source
+        if: always()
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          git archive --format=zip --prefix=NEXUS-AI-0.4.0/ --output=dist/NEXUS-AI-0.4.0-source.zip HEAD
+      - name: Upload standalone onefile EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-AI-0.4.0-windows-x64-onefile
+          path: dist/NEXUS-AI.exe
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload portable onedir ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-AI-0.4.0-windows-x64-portable
+          path: dist/NEXUS-AI-Portable.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload binary checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-AI-0.4.0-windows-x64-checksums
+          path: dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload complete source archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-AI-0.4.0-source
+          path: dist/NEXUS-AI-0.4.0-source.zip
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload executable smoke-test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-AI-0.4.0-windows-x64-smoke-reports
+          path: dist/smoke/
+          if-no-files-found: warn
+          retention-days: 14

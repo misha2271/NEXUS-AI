@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -52,6 +53,11 @@ class ResponsiveGrid(QWidget):
         self.narrow_columns = narrow_columns
         self.columns = 0
         self.grid = QGridLayout(self)
+        # A wide grid must not impose its current column count as the parent's
+        # minimum width. Otherwise Windows font metrics can prevent the resize
+        # event that is needed to switch to the compact layout.
+        self.grid.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.grid.setContentsMargins(0, 0, 0, 0)
         self.grid.setSpacing(14)
         self._reflow(wide_columns)

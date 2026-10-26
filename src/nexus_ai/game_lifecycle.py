@@ -33,9 +33,7 @@ def configured_games(names: Iterable[str]) -> frozenset[str]:
     return frozenset(normalize_executable(name) for name in names)
 
 
-def running_games(
-    names: Iterable[str], *, process_iter=None
-) -> frozenset[str]:
+def running_games(names: Iterable[str], *, process_iter=None) -> frozenset[str]:
     """Read real process names through psutil; ignore inaccessible processes."""
     requested = configured_games(names)
     if not requested:
@@ -103,9 +101,5 @@ class GameGuard:
         started = playing and not was_playing
         finished = was_playing and not playing
         self.active_games = matches
-        unload = (
-            self.last_nexus_model
-            if started and allow_unload and self.last_nexus_model
-            else None
-        )
+        unload = self.last_nexus_model if started and allow_unload else None
         return GameTransition(matches, started, finished, unload)

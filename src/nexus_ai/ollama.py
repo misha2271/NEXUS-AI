@@ -69,6 +69,30 @@ class OllamaClient:
     def close(self) -> None:
         self._client.close()
 
+    def unload_model(self, model: str) -> None:
+        """Ask Ollama to unload one explicitly selected model.
+
+        Ollama is a shared server: unloading can affect another application
+        using the same model. Call only after user opt-in, from a worker,
+        and never while a NEXUS chat request is active.
+        """
+        if not isinstance(model, str) or not model.strip():
+            raise OllamaError(Text("Select an installed model before sending a message."))
+        model = model.strip()
+        try:
+            response = self._client.post(
+                "api/generate",
+                json={"model": model, "prompt": "", "stream": False, "keep_alive": 0},
+            )
+            self._check_status(response, model=model)
+            payload = self._decode_object(response.text)
+        except httpx.RequestError as exc:
+            raise self._network_error(exc) from exc
+        if "error" in payload:
+            raise OllamaError(self._server_error(payload["error"], model))
+        if payload.get("done") is not True:
+            raise OllamaError(Text("Ollama returned an invalid 'done' marker."))
+
     def list_models(self) -> list[OllamaModel]:
         """Return the server's installed models from ``GET /api/tags``."""
         try:

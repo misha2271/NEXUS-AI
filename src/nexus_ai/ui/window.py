@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -323,7 +322,7 @@ class MainWindow(QMainWindow):
         self._monitor_worker.moveToThread(self._monitor_thread)
         self._monitor_thread.started.connect(self._monitor_worker.start)
         self._monitor_worker.sampled.connect(self._show_telemetry)
-        self._monitor_worker.failed.connect(self._telemetry_failed)
+        self._monitor_worker.failed_at.connect(self._telemetry_failed)
         self.monitor_interval_changed.connect(self._monitor_worker.set_interval)
         self.monitor_stop_requested.connect(self._monitor_worker.stop)
         self._monitor_worker.finished.connect(self._monitor_thread.quit)
@@ -666,8 +665,14 @@ class MainWindow(QMainWindow):
         self._apply_policy()
 
     @Slot(str)
-    def _telemetry_failed(self, error: str) -> None:
-        self.history.append_values(time.monotonic(), {})
+    @Slot(str, float)
+    def _telemetry_failed(self, error: str, timestamp: float | None = None) -> None:
+        # Worker timestamps retain emission order even when delivery to the UI
+        # is delayed. Untimestamped callers insert a gap at the last known sample.
+        if timestamp is not None:
+            self.history.append_values(timestamp, {})
+        elif self.history.points:
+            self.history.append_values(self.history.points[-1].timestamp, {})
         for chart in self.charts:
             chart.update()
         self.temperature_status.setText("Temperature readings unavailable")

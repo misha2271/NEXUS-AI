@@ -312,3 +312,29 @@ def test_cancel_discards_late_chunks_and_preserves_only_rendered_partial_reply(d
     assert dashboard._messages == []
     assert not dashboard._pending_chunks
     assert not dashboard.stop_button.isEnabled()
+
+
+def test_queued_telemetry_failure_uses_worker_time_not_ui_delivery_time(dashboard):
+    dashboard._show_telemetry(sample(10))
+    dashboard._telemetry_failed("temporarily disconnected", 11)
+    dashboard._show_telemetry(sample(12))
+    assert dashboard.history.series("cpu") == [(10, 30), (11, None), (12, 30)]
+    dashboard._telemetry_failed("external failure without timestamp")
+    dashboard._show_telemetry(sample(13))
+    assert dashboard.history.series("cpu")[-2:] == [(12, None), (13, 30)]
+
+
+def test_worker_failure_carries_monotonic_emission_timestamp(qapp):
+    from time import monotonic
+
+    def fail():
+        raise PermissionError("sensor denied")
+
+    worker = TelemetryWorker(fail)
+    errors = []
+    worker.failed_at.connect(lambda *args: errors.append(args))
+    before = monotonic()
+    worker.start()
+    after = monotonic()
+    assert errors[0][0] == "sensor denied"
+    assert before <= errors[0][1] <= after

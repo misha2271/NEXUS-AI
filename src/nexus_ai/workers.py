@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from threading import Event
+from time import monotonic
 
 from PySide6.QtCore import QObject, QRunnable, QTimer, Signal, Slot
 
@@ -82,6 +83,7 @@ class OllamaJob(QRunnable):
 class TelemetryWorker(QObject):
     sampled = Signal(object)
     failed = Signal(str)
+    failed_at = Signal(str, float)
     finished = Signal()
 
     def __init__(self, collector_factory: Callable[[], TelemetryCollector]) -> None:
@@ -92,6 +94,12 @@ class TelemetryWorker(QObject):
         self._interval = 1000
         self._stopped = False
 
+    def _report_error(self, exc: Exception) -> None:
+        timestamp = monotonic()
+        message = str(exc) or type(exc).__name__
+        self.failed.emit(message)
+        self.failed_at.emit(message, timestamp)
+
     @Slot()
     def start(self) -> None:
         if self._stopped:
@@ -99,7 +107,7 @@ class TelemetryWorker(QObject):
         try:
             self._collector = self._factory()
         except Exception as exc:
-            self.failed.emit(str(exc) or type(exc).__name__)
+            self._report_error(exc)
             self.finished.emit()
             return
         self._timer = QTimer(self)
@@ -114,7 +122,7 @@ class TelemetryWorker(QObject):
         try:
             self.sampled.emit(self._collector.sample())
         except Exception as exc:
-            self.failed.emit(str(exc) or type(exc).__name__)
+            self._report_error(exc)
 
     @Slot(int)
     def set_interval(self, interval: int) -> None:
@@ -133,7 +141,7 @@ class TelemetryWorker(QObject):
             if self._collector is not None:
                 self._collector.close()
         except Exception as exc:
-            self.failed.emit(str(exc) or type(exc).__name__)
+            self._report_error(exc)
         finally:
             self._collector = None
             self.finished.emit()

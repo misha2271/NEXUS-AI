@@ -46,6 +46,36 @@ Native frozen Windows probes also save UI screenshots beside their smoke reports
 ![Dashboard with actual host telemetry](docs/screenshots/overview.png)
 ![Assistant with the actual unavailable Ollama endpoint](docs/screenshots/assistant.png)
 
+## Languages / Языки
+
+**Русский — язык по умолчанию.** Откройте **Настройки → Язык** и выберите
+**Русский** или **English**. Интерфейс меняется сразу, без перезапуска.
+Выбор языка сохраняется сразу, даже если закрыть диалог кнопкой «Отмена»;
+несохранённый адрес сервера при этом не применяется.
+
+**Russian is the default.** Open **Settings → Language** to switch instantly
+between Russian and English. The preference persists across launches. Language-only
+changes preserve the conversation, draft, selected model, history and performance
+profile. Settings remains available during a request for language selection; the
+Ollama URL stays locked until that request finishes.
+
+Menus, dashboards, chart captions, profiles, tooltips, accessibility labels,
+application notifications and application-owned errors use the centralized catalog
+in `src/nexus_ai/translations.py`. Worker messages retain their templates and are
+rendered in the window's current language. Profile IDs (`Smart`, `Maximum AI`,
+`Gaming`, `Eco`), model IDs, API fields and settings paths remain stable.
+
+User prompts, generated assistant replies, actual device/sensor names and external
+server/OS diagnostic details are preserved verbatim; the application does not
+silently translate model output or hide technical error details. Build logs and
+machine-readable packaging reports retain their diagnostic format. Old settings
+files without a `language` field load in Russian without being rewritten on load.
+
+[Русский интерфейс](docs/screenshots/overview.png) ·
+[Настройки языка](docs/screenshots/settings.png) ·
+[English interface](docs/screenshots/en/overview.png) ·
+[English Settings](docs/screenshots/en/settings.png)
+
 ## Run a standalone Windows build
 
 The repository includes native Windows PyInstaller build configuration for x64

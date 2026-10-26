@@ -78,3 +78,36 @@ physical GPU temperature accuracy, RGB devices, Windows 11 desktop interactions,
 the winget bootstrap, code signing, or installation on a clean user's PC. Those
 remain manual acceptance requirements. Actions uploads tested build artifacts;
 it does not create releases, tags, installers or automatic merges.
+
+## Localization
+
+`i18n.py` holds pure, locale-independent structured messages (`Text`, `JoinedText`)
+and rendering. English source templates are the catalog keys; `translations.py`
+contains their Russian equivalents. Placeholder parity and catalog coverage are
+checked automatically. No translation service or global process locale is used.
+
+Each window owns a `Translator` in `ui/localization.py`. It retains canonical
+captions and QObject-lifetime-managed bindings, updates existing widgets and open
+menus in place, and does not recreate workers, history buffers, or chat state.
+Qt-created action wrappers stay alive until their QObject is destroyed. Transcripts
+separate application notices from raw user/model text so language changes cannot
+alter conversation contents. The retained presentation source is bounded.
+
+Settings stores `language` as `ru` or `en`, defaulting to `ru`. Profile display names
+are localized while combo item data, persisted IDs and inference options remain
+canonical. The language picker saves immediately; cancelling the dialog does not
+undo that explicit choice. Changing only language never clears a chat or restarts
+model discovery. During a request, Settings permits language selection but locks
+and validates endpoint changes. Failed persistence leaves the previous locale in
+use and shows a translated error.
+
+Worker error signals carry structured objects rather than prematurely formatting
+strings. Delayed results, existing notifications, chart values and errors therefore
+follow the current language. Unknown third-party diagnostics remain original data
+inside translated application messages. Standard editing and scrollbar menus have
+localized labels while retaining shortcuts and Qt scrolling actions.
+
+Frozen Windows self-tests additionally verify Russian startup, switch to English,
+check the saved preference, and restore Russian. Both language screenshots are
+uploaded with each executable's smoke reports. They do not require external `.qm`
+resources or Qt Linguist tools.

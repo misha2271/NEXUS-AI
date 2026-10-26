@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 
 from nexus_ai import __version__
 from nexus_ai.history import TelemetryHistory
+from nexus_ai.i18n import JoinedText, Text, error_text
 from nexus_ai.modules import MODULES, IntegrationRegistry
 from nexus_ai.ollama import OllamaClient
 from nexus_ai.profiles import PROFILE_NAMES, InferencePolicy, resolve_policy
@@ -43,22 +44,26 @@ from nexus_ai.ui.dashboard import (
     label,
     scroll_page,
 )
+from nexus_ai.ui.localization import Translator
 from nexus_ai.ui.theme import STYLE
 from nexus_ai.workers import OllamaJob, TelemetryWorker
 
 
 def _gib(value: int | None) -> str:
-    return "Unavailable" if value is None else f"{value / 1024**3:.1f} GiB"
+    return Text("Unavailable") if value is None else Text("{value:.1f} GiB", value=value / 1024**3)
 
 
 class MetricCard(QFrame):
-    def __init__(self, title: str) -> None:
+    def __init__(self, title: str, i18n: Translator) -> None:
         super().__init__()
+        self.i18n = i18n
         self.setObjectName("panel")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(12)
-        layout.addWidget(label(title, "eyebrow"))
+        heading = label("")
+        self.i18n.bind(heading, title)
+        layout.addWidget(heading)
         self.value = QLabel("Waiting for telemetry…")
         self.value.setWordWrap(True)
         self.value.setObjectName("metricValue")
@@ -68,10 +73,11 @@ class MetricCard(QFrame):
         self.bar.setTextVisible(False)
         self.bar.hide()
         layout.addWidget(self.bar)
+        self.i18n.watch_tree(self)
 
     def update_metric(self, percent: float | None, detail: str) -> None:
         self.value.setTextFormat(Qt.TextFormat.PlainText)
-        self.value.setText(detail)
+        self.i18n.bind(self.value, detail, "setText")
         self.value.setStyleSheet("font-size: 13px;" if len(detail) > 40 else "")
         self.bar.setVisible(percent is not None)
         if percent is not None:
@@ -93,6 +99,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.store = store
         self.settings = store.load()
+        self.i18n = Translator(self.settings.language, self)
+        self._transcript_segments: list[tuple[bool, str]] = []
+        self._available_models = []
+        self._sensor_display_names = {}
+        self._last_settings_error = ""
         self._client_factory = client_factory
         self._snapshot: TelemetrySnapshot | None = None
         self._messages: list[dict[str, str]] = []
@@ -119,9 +130,12 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(720, 540)
         self.setStyleSheet(STYLE)
         self._build_ui()
+        self.i18n.watch_tree(self)
+        self.i18n.language_changed.connect(self._retranslate_view)
+        self._retranslate_view()
         self._apply_policy()
         if store.warning:
-            self.settings_status.setText(store.warning)
+            self.i18n.bind(self.settings_status, store.warning, "setText")
         if start_background:
             self._start_monitor(collector_factory)
             QTimer.singleShot(0, self.refresh_models)
@@ -133,7 +147,7 @@ class MainWindow(QMainWindow):
         root = QHBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-        self.sidebar = Sidebar()
+        self.sidebar = Sidebar(self.i18n)
         root.addWidget(self.sidebar)
         workspace = QWidget()
         body = QVBoxLayout(workspace)
@@ -144,9 +158,10 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.breadcrumb, 1)
         toolbar.addWidget(label("PROFILE", "eyebrow"))
         self.profile_combo = QComboBox()
-        self.profile_combo.setAccessibleName("Performance profile")
-        self.profile_combo.addItems(PROFILE_NAMES)
-        self.profile_combo.setCurrentText(self.settings.profile)
+        self.i18n.bind(self.profile_combo, "Performance profile", "setAccessibleName")
+        for profile in PROFILE_NAMES:
+            self.profile_combo.addItem(profile, profile)
+        self.profile_combo.setCurrentIndex(self.profile_combo.findData(self.settings.profile))
         self.profile_combo.currentTextChanged.connect(self._profile_changed)
         toolbar.addWidget(self.profile_combo)
         self.settings_button = QPushButton("Settings")
@@ -154,18 +169,25 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.settings_button)
         body.addLayout(toolbar)
         self.policy_label = label("")
-        self.policy_label.setToolTip("Profiles apply to the next Ollama request, not OS settings.")
+        self.i18n.bind(
+            self.policy_label,
+            "Profiles apply to the next Ollama request, not OS settings.",
+            "setToolTip",
+        )
         body.addWidget(self.policy_label)
         self.stack = QStackedWidget()
         self.pages: dict[str, QWidget] = {}
+        self._route_titles: dict[str, str] = {}
         self.module_pages: dict[str, ModulePage] = {}
         self._add_page("overview", "Overview", self._build_dashboard())
         self._add_page("assistant", "Assistant", self._build_assistant())
         for spec in MODULES:
-            page = ModulePage(spec)
+            page = ModulePage(spec, self.i18n)
             if page.gaming_button is not None:
                 page.gaming_button.clicked.connect(
-                    lambda: self.profile_combo.setCurrentText("Gaming")
+                    lambda: self.profile_combo.setCurrentIndex(
+                        self.profile_combo.findData("Gaming")
+                    )
                 )
             self.module_pages[spec.key] = page
             self._add_page(spec.key, spec.title, scroll_page(page))
@@ -179,6 +201,7 @@ class MainWindow(QMainWindow):
 
     def _add_page(self, key: str, title: str, page: QWidget) -> None:
         self.pages[key] = page
+        self._route_titles[key] = title
         self.stack.addWidget(page)
         self.sidebar.add_route(key, title).clicked.connect(lambda: self.navigate(key))
 
@@ -188,7 +211,11 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.pages[key])
         for name, button in self.sidebar.buttons.items():
             button.setChecked(name == key)
-        self.breadcrumb.setText(f"WORKSPACE / {self.sidebar.buttons[key].text().upper()}")
+        self.i18n.bind(
+            self.breadcrumb,
+            Text("WORKSPACE / {page}", page=Text(self._route_titles[key])),
+            "setText",
+        )
 
     def _build_dashboard(self) -> QWidget:
         content = QWidget()
@@ -198,10 +225,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(
             SectionHeader("System overview", "Live host signals. No simulated metrics.")
         )
-        self.cpu_card = MetricCard("CPU / UTILIZATION")
-        self.ram_card = MetricCard("RAM / SYSTEM MEMORY")
-        self.gpu_card = MetricCard("GPU / NVIDIA UTILIZATION")
-        self.vram_card = MetricCard("VRAM / DEVICE MEMORY")
+        self.cpu_card = MetricCard("CPU / UTILIZATION", self.i18n)
+        self.ram_card = MetricCard("RAM / SYSTEM MEMORY", self.i18n)
+        self.gpu_card = MetricCard("GPU / NVIDIA UTILIZATION", self.i18n)
+        self.vram_card = MetricCard("VRAM / DEVICE MEMORY", self.i18n)
         self.metric_grid = ResponsiveGrid(
             [self.cpu_card, self.ram_card, self.gpu_card, self.vram_card],
             wide_columns=4,
@@ -212,12 +239,18 @@ class MainWindow(QMainWindow):
         self.history_status = label("History begins with this session · up to 300 samples / 10 min")
         layout.addWidget(self.history_status)
         self.charts = [
-            HistoryChart("CPU utilization / %", self.history, "cpu", COLORS[0]),
-            HistoryChart("Memory usage / %", self.history, "ram", COLORS[1]),
-            HistoryChart("GPU utilization / % · all devices", self.history, "gpu:", COLORS[2]),
-            HistoryChart("VRAM usage / % · all devices", self.history, "vram:", COLORS[3]),
-            HistoryChart("Host temperatures / °C", self.history, "temperature:", COLORS[2]),
-            HistoryChart("GPU temperatures / °C", self.history, "gpu_temp:", COLORS[0]),
+            HistoryChart("CPU utilization / %", self.history, "cpu", COLORS[0], self.i18n),
+            HistoryChart("Memory usage / %", self.history, "ram", COLORS[1], self.i18n),
+            HistoryChart(
+                "GPU utilization / % · all devices", self.history, "gpu:", COLORS[2], self.i18n
+            ),
+            HistoryChart(
+                "VRAM usage / % · all devices", self.history, "vram:", COLORS[3], self.i18n
+            ),
+            HistoryChart(
+                "Host temperatures / °C", self.history, "temperature:", COLORS[2], self.i18n
+            ),
+            HistoryChart("GPU temperatures / °C", self.history, "gpu_temp:", COLORS[0], self.i18n),
         ]
         self.chart_grid = ResponsiveGrid(self.charts, wide_columns=2, breakpoint=720)
         layout.addWidget(self.chart_grid)
@@ -260,7 +293,7 @@ class MainWindow(QMainWindow):
         model_row.addWidget(label("MODEL", "eyebrow"))
         self.model_combo = QComboBox()
         self.model_combo.setMinimumWidth(100)
-        self.model_combo.setAccessibleName("Installed Ollama model")
+        self.i18n.bind(self.model_combo, "Installed Ollama model", "setAccessibleName")
         self.model_combo.currentIndexChanged.connect(self._model_changed)
         model_row.addWidget(self.model_combo, 1)
         self.refresh_button = QPushButton("Refresh models")
@@ -272,17 +305,19 @@ class MainWindow(QMainWindow):
         self.transcript = QPlainTextEdit()
         self.transcript.setObjectName("transcript")
         self.transcript.setReadOnly(True)
-        self.transcript.setPlaceholderText(
+        self.i18n.bind(
+            self.transcript,
             "A clear space to think.\n\nChoose an installed model, then start a conversation.\n"
-            "History stays in this session; prompts go to your configured Ollama server."
+            "History stays in this session; prompts go to your configured Ollama server.",
+            "setPlaceholderText",
         )
         self.transcript.document().setMaximumBlockCount(10000)
-        self.transcript.setAccessibleName("Chat transcript")
+        self.i18n.bind(self.transcript, "Chat transcript", "setAccessibleName")
         chat_layout.addWidget(self.transcript, 1)
         self.prompt = QPlainTextEdit()
-        self.prompt.setPlaceholderText("Ask NEXUS…  (Ctrl+Enter to send)")
+        self.i18n.bind(self.prompt, "Ask NEXUS…  (Ctrl+Enter to send)", "setPlaceholderText")
         self.prompt.setFixedHeight(90)
-        self.prompt.setAccessibleName("Message")
+        self.i18n.bind(self.prompt, "Message", "setAccessibleName")
         self.prompt.textChanged.connect(self._update_controls)
         chat_layout.addWidget(self.prompt)
         actions = QHBoxLayout()
@@ -291,7 +326,9 @@ class MainWindow(QMainWindow):
         actions.addWidget(self.clear_button)
         self.copy_button = QPushButton("Copy")
         self.copy_button.clicked.connect(
-            lambda: QApplication.clipboard().setText(self.transcript.toPlainText())
+            lambda: self.i18n.bind(
+                QApplication.clipboard(), self.transcript.toPlainText(), "setText"
+            )
         )
         actions.addWidget(self.copy_button)
         actions.addStretch()
@@ -314,7 +351,78 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         if hasattr(self, "sidebar"):
-            self.sidebar.setFixedWidth(166 if self.width() < 980 else 208)
+            self._resize_sidebar()
+
+    def _resize_sidebar(self) -> None:
+        compact = 192 if self.i18n.language == "ru" else 166
+        self.sidebar.setFixedWidth(compact if self.width() < 980 else 208)
+
+    def set_language(self, language: str) -> bool:
+        if self._closing:
+            return False
+        if language == self.settings.language:
+            return True
+        if not self._persist(replace(self.settings, language=language)):
+            return False
+        self.i18n.set_language(language)
+        return True
+
+    def _retranslate_view(self) -> None:
+        self._resize_sidebar()
+        blocked = self.profile_combo.blockSignals(True)
+        for index in range(self.profile_combo.count()):
+            self.profile_combo.setItemText(
+                index, self.i18n.text(self.profile_combo.itemData(index))
+            )
+        self.profile_combo.blockSignals(blocked)
+        self._apply_policy()
+        current = self.stack.currentWidget()
+        for key, page in self.pages.items():
+            if page is current:
+                self.navigate(key)
+                break
+        for index, model in enumerate(self._available_models):
+            if index < self.model_combo.count():
+                self.model_combo.setItemData(
+                    index,
+                    self.i18n.text(
+                        Text(
+                            "{model} · {size} download size",
+                            model=model.name,
+                            size=_gib(model.size_bytes),
+                        )
+                    ),
+                    Qt.ItemDataRole.ToolTipRole,
+                )
+        self._flush_chunks()
+        scrollbar = self.transcript.verticalScrollBar()
+        at_end = scrollbar.value() == scrollbar.maximum()
+        position = scrollbar.value()
+        self.transcript.setPlainText(
+            "".join(
+                self.i18n.text(message) if localized else message
+                for localized, message in self._transcript_segments
+            )
+        )
+        scrollbar.setValue(scrollbar.maximum() if at_end else position)
+
+    def _record_segment(self, message: str, localized: bool) -> None:
+        if not localized and self._transcript_segments and not self._transcript_segments[-1][0]:
+            message = self._transcript_segments.pop()[1] + message
+        if not localized:
+            message = message[-500_000:]
+        self._transcript_segments.append((localized, message))
+        while len(self._transcript_segments) > 1 and (
+            len(self._transcript_segments) > 1000
+            or sum(len(part) for _, part in self._transcript_segments) > 500_000
+        ):
+            self._transcript_segments.pop(0)
+
+    def _append_transcript(self, message: str) -> None:
+        if self.transcript.toPlainText():
+            self._record_segment("\n", False)
+        self._record_segment(message, True)
+        self.transcript.appendPlainText(self.i18n.text(message))
 
     def _start_monitor(self, factory: Callable[[], TelemetryCollector]) -> None:
         self._monitor_thread = QThread(self)
@@ -340,7 +448,7 @@ class MainWindow(QMainWindow):
 
     def _apply_policy(self) -> None:
         policy = self._policy()
-        self.policy_label.setText(policy.description)
+        self.i18n.bind(self.policy_label, policy.description, "setText")
         self.monitor_interval_changed.emit(policy.monitor_interval_ms)
 
     def _persist(self, candidate: Settings) -> bool:
@@ -348,17 +456,21 @@ class MainWindow(QMainWindow):
             normalized = validate_settings(candidate)
             self.store.save(normalized)
         except (OSError, ValueError) as exc:
-            self.settings_status.setText(f"Settings were not saved: {exc}")
+            self._last_settings_error = Text(
+                "Settings were not saved: {error}", error=error_text(exc)
+            )
+            self.i18n.bind(self.settings_status, self._last_settings_error)
             return False
         self.settings = normalized
-        self.settings_status.setText("")
+        self.i18n.bind(self.settings_status, "", "setText")
         return True
 
     @Slot(str)
     def _profile_changed(self, profile: str) -> None:
+        profile = self.profile_combo.currentData()
         if not self._persist(replace(self.settings, profile=profile)):
             self.profile_combo.blockSignals(True)
-            self.profile_combo.setCurrentText(self.settings.profile)
+            self.profile_combo.setCurrentIndex(self.profile_combo.findData(self.settings.profile))
             self.profile_combo.blockSignals(False)
         self._apply_policy()
 
@@ -372,36 +484,66 @@ class MainWindow(QMainWindow):
     @Slot()
     def open_settings(self) -> None:
         dialog = QDialog(self)
-        dialog.setWindowTitle("Ollama settings")
+        dialog.setObjectName("settingsDialog")
+        dialog.setWindowTitle("Settings")
         dialog.setMinimumWidth(440)
         layout = QFormLayout(dialog)
+        language = QComboBox()
+        language.setObjectName("languageCombo")
+        language.addItem("Русский", "ru")
+        language.addItem("English", "en")
+        language.setCurrentIndex(language.findData(self.settings.language))
+        layout.addRow("Language", language)
+        note = label("Language changes are saved immediately. Other settings use Save.")
+        layout.addRow(note)
         url = QLineEdit(self.settings.ollama_url)
+        url.setObjectName("serverUrl")
         url.setAccessibleName("Ollama server URL")
+        url.setEnabled(not self._jobs)
         layout.addRow("Server URL", url)
-        hint = QLabel("Use an existing Ollama server, such as http://127.0.0.1:11434.")
-        hint.setWordWrap(True)
+        hint = label("Use an existing Ollama server, such as http://127.0.0.1:11434.")
         layout.addRow(hint)
-        error = QLabel()
-        error.setWordWrap(True)
-        error.setTextFormat(Qt.TextFormat.PlainText)
+        error = label("")
+        error.setObjectName("settingsError")
         layout.addRow(error)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
+        self.i18n.bind(buttons.button(QDialogButtonBox.StandardButton.Save), "Save")
+        self.i18n.bind(buttons.button(QDialogButtonBox.StandardButton.Cancel), "Cancel")
+
+        def switch_language() -> None:
+            if self.set_language(language.currentData()):
+                self.i18n.bind(error, "")
+            else:
+                language.blockSignals(True)
+                language.setCurrentIndex(language.findData(self.settings.language))
+                language.blockSignals(False)
+                self.i18n.bind(error, self._last_settings_error)
+
+        language.currentIndexChanged.connect(switch_language)
 
         def save() -> None:
-            candidate = replace(self.settings, ollama_url=url.text())
-            if self._persist(candidate):
+            if self._jobs and url.text() != self.settings.ollama_url:
+                self.i18n.bind(
+                    error, "Wait for the current request before changing the server URL."
+                )
+                return
+            previous_url = self.settings.ollama_url
+            if self._persist(replace(self.settings, ollama_url=url.text())):
                 dialog.accept()
-                self._clear_chat()
-                self.refresh_models()
+                if self.settings.ollama_url != previous_url and not self._jobs:
+                    self._clear_chat()
+                    self.refresh_models()
             else:
-                error.setText(self.settings_status.text())
+                self.i18n.bind(error, self._last_settings_error)
 
         buttons.accepted.connect(save)
         buttons.rejected.connect(dialog.reject)
         layout.addRow(buttons)
+        self.i18n.watch_tree(dialog)
         dialog.exec()
+        dialog.deleteLater()
 
     def _start_job(self, job: OllamaJob) -> None:
         self._jobs.add(job)
@@ -416,7 +558,7 @@ class MainWindow(QMainWindow):
     def refresh_models(self) -> None:
         if self._closing or self._chat_job is not None or self._discovery_job is not None:
             return
-        self.connection_status.setText("Connecting to Ollama…")
+        self.i18n.bind(self.connection_status, "Connecting to Ollama…", "setText")
         self.model_combo.blockSignals(True)
         self.model_combo.clear()
         self.model_combo.blockSignals(False)
@@ -436,9 +578,11 @@ class MainWindow(QMainWindow):
         messages = self._messages[-40:] + [{"role": "user", "content": prompt}]
         self._pending_user = prompt
         self._draft_response = ""
-        self.transcript.appendPlainText(f"You\n{prompt}\n\nNEXUS · {model}\n")
+        self._append_transcript(
+            Text("You\n{prompt}\n\nNEXUS · {model}\n", prompt=prompt, model=model)
+        )
         self.prompt.clear()
-        self.connection_status.setText("Generating…")
+        self.i18n.bind(self.connection_status, "Generating…", "setText")
         job = OllamaJob(
             "chat",
             self.settings.ollama_url,
@@ -471,6 +615,7 @@ class MainWindow(QMainWindow):
         cursor.insertText(text)
         self.transcript.setTextCursor(cursor)
         self.transcript.ensureCursorVisible()
+        self._record_segment(text, False)
 
     @Slot(object, object)
     def _job_result(self, job: OllamaJob, result: object) -> None:
@@ -478,12 +623,19 @@ class MainWindow(QMainWindow):
             return
         if job is self._discovery_job:
             models = result
+            self._available_models = models
             self.model_combo.blockSignals(True)
             for model in models:
                 self.model_combo.addItem(model.name, model.name)
                 self.model_combo.setItemData(
                     self.model_combo.count() - 1,
-                    f"{model.name} · {_gib(model.size_bytes)} download size",
+                    self.i18n.text(
+                        Text(
+                            "{model} · {size} download size",
+                            model=model.name,
+                            size=_gib(model.size_bytes),
+                        )
+                    ),
                     Qt.ItemDataRole.ToolTipRole,
                 )
             selected = self.model_combo.findData(self.settings.model)
@@ -491,20 +643,26 @@ class MainWindow(QMainWindow):
                 self.model_combo.setCurrentIndex(selected)
             self.model_combo.blockSignals(False)
             if models:
-                self.connection_status.setText(
-                    f"Ollama connected · {len(models)} installed model(s)"
+                self.i18n.bind(
+                    self.connection_status,
+                    Text("Ollama connected · {count} installed model(s)", count=len(models)),
+                    "setText",
                 )
             else:
-                self.connection_status.setText(
-                    "No installed models. Run 'ollama pull llama3.2:3b', then refresh models."
+                self.i18n.bind(
+                    self.connection_status,
+                    "No installed models. Run 'ollama pull llama3.2:3b', then refresh models.",
+                    "setText",
                 )
         elif job is self._chat_job:
             self._flush_chunks()
             if job.cancel_event.is_set():
-                self.transcript.appendPlainText(
+                self._append_transcript(
                     "\n[Generation stopped; partial reply excluded from context.]\n"
                 )
-                self.connection_status.setText("Stopped. Ready for another message.")
+                self.i18n.bind(
+                    self.connection_status, "Stopped. Ready for another message.", "setText"
+                )
             elif self._draft_response:
                 self._messages.extend(
                     [
@@ -513,22 +671,33 @@ class MainWindow(QMainWindow):
                     ]
                 )
                 self._messages = self._messages[-40:]
-                self.transcript.appendPlainText("\n")
-                self.connection_status.setText("Ready · reply complete")
+                self._append_transcript("\n")
+                self.i18n.bind(self.connection_status, "Ready · reply complete", "setText")
             else:
-                self.transcript.appendPlainText("[Ollama completed without answer text.]\n")
-                self.connection_status.setText(
-                    "No answer text returned. Try another model or prompt."
+                self._append_transcript("[Ollama completed without answer text.]\n")
+                self.i18n.bind(
+                    self.connection_status,
+                    "No answer text returned. Try another model or prompt.",
+                    "setText",
                 )
 
-    @Slot(object, str)
-    def _job_failed(self, job: OllamaJob, error: str) -> None:
+    @Slot(object, object)
+    def _job_failed(self, job: OllamaJob, error: object) -> None:
         if self._closing:
             return
-        self.connection_status.setText(error)
+        error = error_text(error)
+        status = (
+            error
+            if isinstance(error, (Text, JoinedText))
+            else Text(
+                "Ollama request failed: {error}",
+                error=error,
+            )
+        )
+        self.i18n.bind(self.connection_status, status, "setText")
         if job is self._chat_job:
             self._flush_chunks()
-            self.transcript.appendPlainText(f"\n[Reply failed: {error}]\n")
+            self._append_transcript(Text("\n[Reply failed: {error}]\n", error=error))
             if not self.prompt.toPlainText():
                 self.prompt.setPlainText(self._pending_user)
 
@@ -549,8 +718,10 @@ class MainWindow(QMainWindow):
             self._flush_chunks()
             self._chat_job.cancel()
             self.stop_button.setEnabled(False)
-            self.connection_status.setText(
-                "Stopping… waiting for the next response chunk or network timeout."
+            self.i18n.bind(
+                self.connection_status,
+                "Stopping… waiting for the next response chunk or network timeout.",
+                "setText",
             )
 
     @Slot()
@@ -558,6 +729,7 @@ class MainWindow(QMainWindow):
         if self._chat_job is None:
             self._messages.clear()
             self.transcript.clear()
+            self._transcript_segments.clear()
 
     @Slot()
     def _update_controls(self) -> None:
@@ -569,7 +741,7 @@ class MainWindow(QMainWindow):
         )
         self.refresh_button.setEnabled(not busy)
         self.model_combo.setEnabled(not busy)
-        self.settings_button.setEnabled(not busy)
+        self.settings_button.setEnabled(not self._closing)
         self.clear_button.setEnabled(not busy)
         self.profile_combo.setEnabled(not self._closing)
         self.prompt.setEnabled(not self._closing)
@@ -583,26 +755,64 @@ class MainWindow(QMainWindow):
             and not self._closing
         )
 
+    def _series_label(self, key: str) -> str:
+        if key == "cpu":
+            return Text("CPU utilization / %")
+        if key == "ram":
+            return Text("Memory usage / %")
+        prefix, _, index = key.partition(":")
+        if prefix == "temperature":
+            return self._sensor_display_names.get(key, index)
+        template = {
+            "gpu": "GPU {index}",
+            "vram": "VRAM {index}",
+            "gpu_temp": "GPU {index} temperature",
+        }.get(prefix)
+        return Text(template, index=index) if template else key
+
     @Slot(object)
     def _show_telemetry(self, snapshot: TelemetrySnapshot) -> None:
         if self._closing:
             return
         self._snapshot = snapshot
         self.history.append(snapshot)
+        self._sensor_display_names.update(
+            {f"temperature:{sensor.name}": sensor.name for sensor in snapshot.temperatures}
+        )
+        active = set(self.history.keys("temperature:"))
+        self._sensor_display_names = {
+            key: value for key, value in self._sensor_display_names.items() if key in active
+        }
         for chart in self.charts:
             keys = self.history.keys(chart.prefix)
-            chart.setToolTip("\n".join(keys) or "No sensor readings available")
-            chart.setAccessibleDescription("Historical series: " + ", ".join(keys))
+            self.i18n.bind(
+                chart,
+                JoinedText(self._series_label(key) for key in keys)
+                or "No sensor readings available",
+                "setToolTip",
+            )
+            self.i18n.bind(
+                chart,
+                Text(
+                    "Historical series: {series}",
+                    series=JoinedText((self._series_label(key) for key in keys), ", "),
+                ),
+                "setAccessibleDescription",
+            )
             chart.update()
-        self.history_status.setText(
-            f"{len(self.history.points)} real samples · up to 300 samples / 10 min · "
-            "GPU lines follow device index"
+        self.i18n.bind(
+            self.history_status,
+            Text(
+                "{count} real samples · up to 300 samples / 10 min · GPU lines follow device index",
+                count=len(self.history.points),
+            ),
+            "setText",
         )
         gpu = snapshot.gpus[0] if snapshot.gpus else None
         self.gpu_card.update_metric(
             gpu.utilization_percent if gpu else None,
             (
-                f"{gpu.utilization_percent:.1f}% · {gpu.name}"
+                Text("{value:.1f}% · {name}", value=gpu.utilization_percent, name=gpu.name)
                 if gpu and gpu.utilization_percent is not None
                 else "GPU unavailable"
             ),
@@ -614,59 +824,82 @@ class MainWindow(QMainWindow):
         )
         self.vram_card.update_metric(
             vram,
-            f"{_gib(gpu.memory_used_bytes)} / {_gib(gpu.memory_total_bytes)}"
+            Text(
+                "{used} / {total}",
+                used=_gib(gpu.memory_used_bytes),
+                total=_gib(gpu.memory_total_bytes),
+            )
             if gpu
             else "VRAM unavailable",
         )
-        self.gpu_card.setToolTip("First reported GPU; all devices are shown below and in charts.")
-        self.vram_card.setToolTip("Memory of first reported GPU; all devices are charted.")
-        self.temperature_status.setText(snapshot.temperature_status)
-        self.temperature_values.setText(
-            "\n".join(
-                f"{sensor.name}: {sensor.current_c:.1f} °C" for sensor in snapshot.temperatures
+        self.i18n.bind(
+            self.gpu_card,
+            "First reported GPU; all devices are shown below and in charts.",
+            "setToolTip",
+        )
+        self.i18n.bind(
+            self.vram_card, "Memory of first reported GPU; all devices are charted.", "setToolTip"
+        )
+        self.i18n.bind(self.temperature_status, snapshot.temperature_status, "setText")
+        self.i18n.bind(
+            self.temperature_values,
+            JoinedText(
+                Text("{name}: {value:.1f} °C", name=sensor.name, value=sensor.current_c)
+                for sensor in snapshot.temperatures
             )
-            or "No host sensor data. Windows CPU temperatures require a supported sensor provider."
+            or "No host sensor data. Windows CPU temperatures require a supported sensor provider.",
+            "setText",
         )
         cpu = snapshot.cpu_percent
-        cpu_text = f"{cpu:.1f}%" if cpu is not None else snapshot.cpu_status
+        cpu_text = Text("{value:.1f}%", value=cpu) if cpu is not None else snapshot.cpu_status
         self.cpu_card.update_metric(cpu, cpu_text)
         ram = snapshot.ram_percent
         ram_text = (
-            f"{ram:.1f}%  ·  {_gib(snapshot.ram_used_bytes)} / {_gib(snapshot.ram_total_bytes)}"
+            Text(
+                "{value:.1f}%  ·  {used} / {total}",
+                value=ram,
+                used=_gib(snapshot.ram_used_bytes),
+                total=_gib(snapshot.ram_total_bytes),
+            )
             if ram is not None
             else snapshot.ram_status
         )
         self.ram_card.update_metric(ram, ram_text)
-        self.gpu_status.setText(snapshot.gpu_status)
+        self.i18n.bind(self.gpu_status, snapshot.gpu_status, "setText")
         indices = {gpu.index for gpu in snapshot.gpus}
         for index in list(self._gpu_cards):
             if index not in indices:
                 self._gpu_cards.pop(index).deleteLater()
         for gpu in snapshot.gpus:
             if gpu.index not in self._gpu_cards:
-                card = MetricCard(f"GPU {gpu.index} · {gpu.name}")
+                card = MetricCard(
+                    Text("GPU {index} · {name}", index=gpu.index, name=gpu.name), self.i18n
+                )
                 self._gpu_cards[gpu.index] = card
                 self._gpu_layout.addWidget(card)
             utilization = (
-                f"{gpu.utilization_percent:.0f}% utilization"
+                Text("{value:.0f}% utilization", value=gpu.utilization_percent)
                 if gpu.utilization_percent is not None
                 else "Utilization unavailable"
             )
             temperature = (
-                f"{gpu.temperature_c:.0f} °C"
+                Text("{value:.0f} °C", value=gpu.temperature_c)
                 if gpu.temperature_c is not None
                 else "Temperature unavailable"
             )
-            detail = (
-                f"{utilization}\nVRAM: {_gib(gpu.memory_used_bytes)} / "
-                f"{_gib(gpu.memory_total_bytes)}\n{temperature}"
+            detail = Text(
+                "{utilization}\nVRAM: {used} / {total}\n{temperature}",
+                utilization=Text(utilization) if type(utilization) is str else utilization,
+                used=_gib(gpu.memory_used_bytes),
+                total=_gib(gpu.memory_total_bytes),
+                temperature=Text(temperature) if type(temperature) is str else temperature,
             )
             self._gpu_cards[gpu.index].update_metric(gpu.utilization_percent, detail)
         self._apply_policy()
 
     @Slot(str)
-    @Slot(str, float)
-    def _telemetry_failed(self, error: str, timestamp: float | None = None) -> None:
+    @Slot(object, float)
+    def _telemetry_failed(self, error: object, timestamp: float | None = None) -> None:
         # Worker timestamps retain emission order even when delivery to the UI
         # is delayed. Untimestamped callers insert a gap at the last known sample.
         if timestamp is not None:
@@ -675,8 +908,8 @@ class MainWindow(QMainWindow):
             self.history.append_values(self.history.points[-1].timestamp, {})
         for chart in self.charts:
             chart.update()
-        self.temperature_status.setText("Temperature readings unavailable")
-        self.temperature_values.setText("")
+        self.i18n.bind(self.temperature_status, "Temperature readings unavailable", "setText")
+        self.i18n.bind(self.temperature_values, "", "setText")
         self.gpu_card.update_metric(None, "GPU unavailable")
         self.vram_card.update_metric(None, "VRAM unavailable")
         self._snapshot = None
@@ -685,7 +918,11 @@ class MainWindow(QMainWindow):
         for card in self._gpu_cards.values():
             card.deleteLater()
         self._gpu_cards.clear()
-        self.gpu_status.setText(f"Telemetry unavailable: {error}")
+        self.i18n.bind(
+            self.gpu_status,
+            Text("Telemetry unavailable: {error}", error=error_text(error)),
+            "setText",
+        )
         self._apply_policy()
 
     def closeEvent(self, event: QCloseEvent) -> None:
@@ -701,8 +938,14 @@ class MainWindow(QMainWindow):
                 if monitor_running:
                     self.monitor_stop_requested.emit()
                 message = "Closing… waiting for background work to finish."
-                self.connection_status.setText(message)
-                self.settings_status.setText(message + " Network reads can take up to 60 seconds.")
+                self.i18n.bind(self.connection_status, message, "setText")
+                self.i18n.bind(
+                    self.settings_status,
+                    Text(
+                        "{message} Network reads can take up to 60 seconds.", message=Text(message)
+                    ),
+                    "setText",
+                )
                 self._update_controls()
                 self._shutdown_timer.start()
             return

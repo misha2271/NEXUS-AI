@@ -67,7 +67,7 @@ def run_self_test(app: QApplication, report_path: Path) -> int:
         window = MainWindow(probe, start_background=False)
         window.show()
         app.processEvents()
-        if not window.isVisible() or window.profile_combo.currentText() != expected.profile:
+        if not window.isVisible() or window.profile_combo.currentData() != expected.profile:
             raise RuntimeError("The Qt desktop window did not initialize correctly.")
         report["ui_constructed"] = True
 
@@ -101,6 +101,23 @@ def run_self_test(app: QApplication, report_path: Path) -> int:
             if not window.grab().save(str(screenshot_path)):
                 raise RuntimeError("The frozen UI screenshot could not be saved.")
             report["screenshot_path"] = str(screenshot_path)
+            if window.settings.language != "ru" or window.settings_button.text() != "Настройки":
+                raise RuntimeError("The frozen application did not default to Russian.")
+            if not window.set_language("en") or window.settings_button.text() != "Settings":
+                raise RuntimeError("The frozen English language switch failed.")
+            if probe.load().language != "en":
+                raise RuntimeError("The English preference was not persisted.")
+            app.processEvents()
+            english_path = screenshot_path.with_stem(screenshot_path.stem + "-en")
+            if not window.grab().save(str(english_path)):
+                raise RuntimeError("The frozen English UI screenshot could not be saved.")
+            report["english_screenshot_path"] = str(english_path)
+            if not window.set_language("ru") or probe.load().language != "ru":
+                raise RuntimeError("The Russian preference was not restored.")
+            if window.profile_combo.currentData() != expected.profile:
+                raise RuntimeError("Language switching changed the inference profile.")
+            report["languages_tested"] = ["ru", "en"]
+            report["language_persistence"] = True
     except Exception as exc:
         errors.append(str(exc) or type(exc).__name__)
     finally:

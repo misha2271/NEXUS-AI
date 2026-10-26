@@ -14,13 +14,14 @@ from pathlib import Path
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
-from nexus_ai.settings import SettingsStore
+from nexus_ai.settings import Settings, SettingsStore
 from nexus_ai.ui.window import MainWindow
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("docs/screenshots"))
+    parser.add_argument("--language", choices=("ru", "en"), default="ru")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     app = QApplication([])
@@ -28,7 +29,9 @@ def main() -> int:
     failures: list[str] = []
     captured: list[str] = []
     with tempfile.TemporaryDirectory(prefix="nexus-ui-capture-") as temporary:
-        window = MainWindow(SettingsStore(Path(temporary) / "settings.json"))
+        store = SettingsStore(Path(temporary) / "settings.json")
+        store.save(Settings(language=args.language))
+        window = MainWindow(store)
         window.resize(1440, 1150)
         window.show()
 
@@ -46,6 +49,21 @@ def main() -> int:
                     if not window.grab().save(str(args.output / name)):
                         raise RuntimeError(f"Could not save {name}")
                     captured.append(name)
+
+                def capture_settings() -> None:
+                    dialog = QApplication.activeModalWidget()
+                    try:
+                        app.processEvents()
+                        if not dialog.grab().save(str(args.output / "settings.png")):
+                            raise RuntimeError("Could not save Settings screenshot")
+                        captured.append("settings.png")
+                    except Exception as exc:
+                        failures.append(str(exc))
+                    finally:
+                        dialog.reject()
+
+                QTimer.singleShot(0, capture_settings)
+                window.open_settings()
                 print(f"Captured {len(window.history.points)} actual host samples.")
                 print("Ollama status:", window.connection_status.text())
                 print("GPU status:", window.gpu_status.text())
@@ -57,7 +75,7 @@ def main() -> int:
 
         QTimer.singleShot(12000, capture)
         app.exec()
-    if failures or len(captured) != 4:
+    if failures or len(captured) != 5:
         raise RuntimeError("Screenshot capture incomplete: " + "; ".join(failures))
     print("Saved:", ", ".join(captured))
     return 0

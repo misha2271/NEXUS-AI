@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import pytest
 from PySide6.QtCore import QRunnable
@@ -82,7 +82,8 @@ def make_window(qtbot, tmp_path):
         api = api or ApiFixture()
         store = store or SettingsStore(tmp_path / f"settings-{len(windows)}.json")
         if settings is not None:
-            store.save(settings)
+            store.save(replace(settings, language="en"))
+        store.save(replace(store.load(), language="en"))
         window = MainWindow(store, client_factory=api.client, start_background=False)
         windows.append(window)
         fixtures.append(api)
@@ -232,7 +233,7 @@ def test_cancel_excludes_partial_reply_and_releases_safe_controls(make_window, q
     window.send_message()
     qtbot.waitUntil(lambda: "partial reply" in window.transcript.toPlainText())
     assert not window.refresh_button.isEnabled()
-    assert not window.settings_button.isEnabled()
+    assert window.settings_button.isEnabled()  # language remains available during generation
     assert not window.model_combo.isEnabled()
     assert not window.clear_button.isEnabled()
     assert window.stop_button.isEnabled()

@@ -8,6 +8,7 @@ from time import monotonic
 
 from PySide6.QtCore import QObject, QRunnable, QTimer, Signal, Slot
 
+from nexus_ai.i18n import error_text
 from nexus_ai.ollama import OllamaClient
 from nexus_ai.profiles import InferencePolicy
 from nexus_ai.telemetry import TelemetryCollector
@@ -16,7 +17,7 @@ from nexus_ai.telemetry import TelemetryCollector
 class JobSignals(QObject):
     result = Signal(object, object)
     chunk = Signal(object, str)
-    failed = Signal(object, str)
+    failed = Signal(object, object)
     finished = Signal(object)
 
 
@@ -75,7 +76,7 @@ class OllamaJob(QRunnable):
                 if self.kind == "chat":
                     self.signals.result.emit(self, None)
             else:
-                self.signals.failed.emit(self, str(exc) or type(exc).__name__)
+                self.signals.failed.emit(self, error_text(exc))
         finally:
             self.signals.finished.emit(self)
 
@@ -83,7 +84,7 @@ class OllamaJob(QRunnable):
 class TelemetryWorker(QObject):
     sampled = Signal(object)
     failed = Signal(str)
-    failed_at = Signal(str, float)
+    failed_at = Signal(object, float)
     finished = Signal()
 
     def __init__(self, collector_factory: Callable[[], TelemetryCollector]) -> None:
@@ -96,7 +97,7 @@ class TelemetryWorker(QObject):
 
     def _report_error(self, exc: Exception) -> None:
         timestamp = monotonic()
-        message = str(exc) or type(exc).__name__
+        message = error_text(exc)
         self.failed.emit(message)
         self.failed_at.emit(message, timestamp)
 

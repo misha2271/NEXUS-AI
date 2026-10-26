@@ -19,7 +19,9 @@ from PySide6.QtWidgets import (
 
 from nexus_ai import __version__
 from nexus_ai.history import TelemetryHistory
+from nexus_ai.i18n import Text
 from nexus_ai.modules import ModuleSpec
+from nexus_ai.ui.localization import Translator
 
 COLORS = ("#8ce0c4", "#a8b5ff", "#e1b884", "#8bc8ed")
 
@@ -85,9 +87,13 @@ class ResponsiveGrid(QWidget):
 
 
 class HistoryChart(QFrame):
-    def __init__(self, title: str, history: TelemetryHistory, prefix: str, color: str) -> None:
+    def __init__(
+        self, title: str, history: TelemetryHistory, prefix: str, color: str, i18n: Translator
+    ) -> None:
         super().__init__()
         self.setObjectName("panel")
+        self.i18n = i18n
+        self.i18n.language_changed.connect(self.update)
         self.title = title
         self.history = history
         self.prefix = prefix
@@ -95,7 +101,9 @@ class HistoryChart(QFrame):
         self.setMinimumHeight(188)
         self.setMinimumWidth(180)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.setAccessibleName(f"{title} historical chart")
+        self.i18n.bind(
+            self, Text("{title} historical chart", title=Text(title)), "setAccessibleName"
+        )
 
     def chart_series(self) -> list[list[tuple[float, float | None]]]:
         keys = self.history.keys(self.prefix)
@@ -106,7 +114,7 @@ class HistoryChart(QFrame):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(QColor("#e6eaf2"))
-        painter.drawText(18, 28, self.title)
+        painter.drawText(18, 28, self.i18n.text(self.title))
         plot = QRectF(18, 48, max(1, self.width() - 66), self.height() - 88)
         temperatures = self.prefix.endswith("temp:") or self.prefix == "temperature:"
         series = self.chart_series()
@@ -121,10 +129,14 @@ class HistoryChart(QFrame):
             painter.setPen(QPen(QColor("#27313c"), 1))
         if not valid:
             painter.setPen(QColor("#8793a6"))
-            painter.drawText(plot, Qt.AlignmentFlag.AlignCenter, "No readings available")
+            painter.drawText(
+                plot, Qt.AlignmentFlag.AlignCenter, self.i18n.text("No readings available")
+            )
         elif len(self.history.points) < 2:
             painter.setPen(QColor("#8793a6"))
-            painter.drawText(plot, Qt.AlignmentFlag.AlignCenter, "Collecting history…")
+            painter.drawText(
+                plot, Qt.AlignmentFlag.AlignCenter, self.i18n.text("Collecting history…")
+            )
         else:
             first = self.history.points[0].timestamp
             span = max(1, self.history.points[-1].timestamp - first)
@@ -155,12 +167,18 @@ class HistoryChart(QFrame):
             if self.history.points
             else 0
         )
-        painter.drawText(18, self.height() - 14, f"{duration:.0f}s captured · gaps = unavailable")
+        painter.drawText(
+            18,
+            self.height() - 14,
+            self.i18n.text(
+                Text("{duration:.0f}s captured · gaps = unavailable", duration=duration)
+            ),
+        )
         painter.end()
 
 
 class ModulePage(QWidget):
-    def __init__(self, spec: ModuleSpec) -> None:
+    def __init__(self, spec: ModuleSpec, i18n: Translator) -> None:
         super().__init__()
         self.spec = spec
         layout = QVBoxLayout(self)
@@ -179,7 +197,8 @@ class ModulePage(QWidget):
         body.addWidget(label("Hardware controls remain locked until a supported SDK is validated."))
         self.controls: list[QPushButton] = []
         for action in spec.controls:
-            button = QPushButton(f"{action} · unavailable")
+            button = QPushButton()
+            i18n.bind(button, Text("{action} · unavailable", action=Text(action)))
             button.setEnabled(False)
             button.setToolTip("Requires an implemented, supported and hardware-validated provider")
             self.controls.append(button)
@@ -191,13 +210,16 @@ class ModulePage(QWidget):
             self.gaming_button.setObjectName("primary")
             layout.addWidget(self.gaming_button)
         if spec.key == "updates":
-            layout.addWidget(label(f"Installed application  /  {__version__}", "body"))
+            version = label("", "body")
+            i18n.bind(version, Text("Installed application  /  {version}", version=__version__))
+            layout.addWidget(version)
         layout.addStretch()
 
 
 class Sidebar(QFrame):
-    def __init__(self) -> None:
+    def __init__(self, i18n: Translator) -> None:
         super().__init__()
+        self.i18n = i18n
         self.setObjectName("sidebar")
         self.setFixedWidth(208)
         self.layout = QVBoxLayout(self)
@@ -221,7 +243,8 @@ class Sidebar(QFrame):
         button = QPushButton(title)
         button.setObjectName("nav")
         button.setCheckable(True)
-        button.setAccessibleName(f"Navigate to {title}")
+        button.setToolTip(title)
+        self.i18n.bind(button, Text("Navigate to {title}", title=Text(title)), "setAccessibleName")
         self.nav_layout.addWidget(button)
         self.buttons[key] = button
         return button

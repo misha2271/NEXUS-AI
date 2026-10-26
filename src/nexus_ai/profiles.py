@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from nexus_ai.i18n import Text
+
 PROFILE_NAMES = ("Smart", "Maximum AI", "Gaming", "Eco")
 _GIB = 1024**3
 
@@ -34,7 +36,7 @@ def resolve_policy(
     priority, hardware fan speeds, clocks, or driver settings.
     """
     if profile not in PROFILE_NAMES:
-        raise ValueError(f"Unknown performance profile: {profile}")
+        raise ValueError(Text("Unknown performance profile: {profile}", profile=profile))
     count = cpu_count if isinstance(cpu_count, int) and cpu_count > 0 else os.cpu_count()
     count = max(1, count or 1)
     if profile == "Maximum AI":

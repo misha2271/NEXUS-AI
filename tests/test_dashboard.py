@@ -109,7 +109,9 @@ def test_temperature_permission_failure_preserves_cpu_and_ram():
 
 @pytest.fixture
 def dashboard(qtbot, tmp_path):
-    window = MainWindow(SettingsStore(tmp_path / "settings.json"), start_background=False)
+    store = SettingsStore(tmp_path / "settings.json")
+    store.save(replace(store.load(), language="en"))
+    window = MainWindow(store, start_background=False)
     qtbot.addWidget(window)
     window.show()
     yield window

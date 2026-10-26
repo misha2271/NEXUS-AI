@@ -13,6 +13,8 @@ from typing import Any, Iterator
 
 import httpx
 
+from nexus_ai.i18n import JoinedText, Text
+
 
 class OllamaError(Exception):
     """An actionable connection, HTTP, or Ollama protocol error."""
@@ -37,7 +39,7 @@ class OllamaClient:
         try:
             url = httpx.URL(base_url.strip())
         except (httpx.InvalidURL, AttributeError) as exc:
-            raise ValueError("Ollama URL must be an HTTP or HTTPS URL.") from exc
+            raise ValueError(Text("Ollama URL must be an HTTP or HTTPS URL.")) from exc
         if (
             url.scheme not in {"http", "https"}
             or not url.host
@@ -47,7 +49,7 @@ class OllamaClient:
             or url.fragment
         ):
             raise ValueError(
-                "Ollama URL needs an HTTP(S) host without credentials, query, or fragment."
+                Text("Ollama URL needs an HTTP(S) host without credentials, query, or fragment.")
             )
         self.base_url = str(url).rstrip("/")
         self._client = httpx.Client(
@@ -76,20 +78,20 @@ class OllamaClient:
         except httpx.RequestError as exc:
             raise self._network_error(exc) from exc
         if "error" in payload:
-            raise OllamaError(f"Ollama: {payload['error']}")
+            raise OllamaError(Text("Ollama: {detail}", detail=payload["error"]))
         models = payload.get("models")
         if not isinstance(models, list):
-            raise OllamaError("Ollama returned an invalid model list (expected 'models').")
+            raise OllamaError(Text("Ollama returned an invalid model list (expected 'models')."))
         result: list[OllamaModel] = []
         for item in models:
             if not isinstance(item, dict):
-                raise OllamaError("Ollama returned an invalid model entry.")
+                raise OllamaError(Text("Ollama returned an invalid model entry."))
             name = item.get("name")
             size = item.get("size")
             if not isinstance(name, str) or not name.strip():
-                raise OllamaError("Ollama returned a model without a valid name.")
+                raise OllamaError(Text("Ollama returned a model without a valid name."))
             if size is not None and (type(size) is not int or size < 0):
-                raise OllamaError("Ollama returned an invalid model size.")
+                raise OllamaError(Text("Ollama returned an invalid model size."))
             result.append(OllamaModel(name=name, size_bytes=size))
         return result
 
@@ -110,7 +112,7 @@ class OllamaClient:
         with the default timeout, including the initial model load.
         """
         if not isinstance(model, str) or not model.strip():
-            raise OllamaError("Select an installed model before sending a message.")
+            raise OllamaError(Text("Select an installed model before sending a message."))
         if self._cancelled(cancel_event):
             return
         body: dict[str, Any] = {
@@ -135,11 +137,11 @@ class OllamaClient:
                         raise OllamaError(self._server_error(chunk["error"], model))
                     done = chunk.get("done", False)
                     if not isinstance(done, bool):
-                        raise OllamaError("Ollama returned an invalid 'done' marker.")
+                        raise OllamaError(Text("Ollama returned an invalid 'done' marker."))
                     message = chunk.get("message")
                     if message is not None:
                         if not isinstance(message, dict):
-                            raise OllamaError("Ollama returned an invalid chat message.")
+                            raise OllamaError(Text("Ollama returned an invalid chat message."))
                         # Thinking-capable models may send a reasoning-only
                         # message before their answer. Do not display reasoning
                         # as the assistant's answer or require answer text yet.
@@ -148,16 +150,18 @@ class OllamaClient:
                         else:
                             content = message.get("content")
                         if not isinstance(content, str):
-                            raise OllamaError("Ollama returned an invalid chat message.")
+                            raise OllamaError(Text("Ollama returned an invalid chat message."))
                         if content:
                             yield content
                     elif not done:
-                        raise OllamaError("Ollama returned a chat chunk without a message.")
+                        raise OllamaError(Text("Ollama returned a chat chunk without a message."))
                     if done:
                         return
                 if self._cancelled(cancel_event):
                     return
-                raise OllamaError("Ollama disconnected before completing the reply. Try again.")
+                raise OllamaError(
+                    Text("Ollama disconnected before completing the reply. Try again.")
+                )
         except httpx.RequestError as exc:
             if self._cancelled(cancel_event):
                 return
@@ -172,9 +176,11 @@ class OllamaClient:
         try:
             payload = json.loads(text)
         except (ValueError, TypeError) as exc:
-            raise OllamaError("Ollama returned malformed JSON. Check the server URL.") from exc
+            raise OllamaError(
+                Text("Ollama returned malformed JSON. Check the server URL.")
+            ) from exc
         if not isinstance(payload, dict):
-            raise OllamaError("Ollama returned an invalid response (expected a JSON object).")
+            raise OllamaError(Text("Ollama returned an invalid response (expected a JSON object)."))
         return payload
 
     @classmethod
@@ -190,31 +196,48 @@ class OllamaClient:
             pass
         if model is not None and response.status_code == 404:
             raise OllamaError(
-                f"Model '{model}' is unavailable. Install it with 'ollama pull {model}', "
-                "then refresh the model list. " + detail
+                Text(
+                    "Model '{model}' is unavailable. Install it with 'ollama pull {model}', "
+                    "then refresh the model list. {detail}",
+                    model=model,
+                    detail=detail,
+                )
             )
-        error = f"Ollama HTTP {response.status_code}."
+        error = Text("Ollama HTTP {status}.", status=response.status_code)
         if detail:
-            error += " " + detail
+            error = JoinedText((error, " " + detail), "")
         if response.status_code == 404:
-            error += " Check the server URL; it must point to an Ollama server."
+            error = JoinedText(
+                (error, Text(" Check the server URL; it must point to an Ollama server.")), ""
+            )
         raise OllamaError(error)
 
     @staticmethod
     def _network_error(exc: httpx.RequestError) -> OllamaError:
         if isinstance(exc, httpx.TimeoutException):
             return OllamaError(
-                "Ollama request timed out. The model may still be loading; "
-                "check Ollama and try again, or choose a smaller model."
+                Text(
+                    "Ollama request timed out. The model may still be loading; "
+                    "check Ollama and try again, or choose a smaller model."
+                )
             )
         return OllamaError(
-            "Cannot reach Ollama. Start it with 'ollama serve' and check the server URL."
+            Text("Cannot reach Ollama. Start it with 'ollama serve' and check the server URL.")
         )
 
     @staticmethod
     def _server_error(error: object, model: str) -> str:
-        detail = error if isinstance(error, str) else "Unknown server error"
-        message = f"Ollama: {detail}"
+        detail = error if isinstance(error, str) else Text("Unknown server error")
+        message = Text("Ollama: {detail}", detail=detail)
         if "not found" in detail.lower():
-            message += f" Install the model with 'ollama pull {model}' and refresh models."
+            message = JoinedText(
+                (
+                    message,
+                    Text(
+                        " Install the model with 'ollama pull {model}' and refresh models.",
+                        model=model,
+                    ),
+                ),
+                "",
+            )
         return message

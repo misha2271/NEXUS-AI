@@ -15,6 +15,8 @@ from typing import Any
 
 import psutil
 
+from nexus_ai.i18n import JoinedText, Text
+
 _AUTO = object()
 
 
@@ -70,7 +72,7 @@ class TelemetryCollector:
 
     def sample(self) -> TelemetrySnapshot:
         if self._closed:
-            raise RuntimeError("Telemetry collector is closed")
+            raise RuntimeError(Text("Telemetry collector is closed"))
 
         cpu_percent = None
         cpu_status = "Collecting first CPU sample"
@@ -82,7 +84,7 @@ class TelemetryCollector:
             self._cpu_primed = True
         except Exception as exc:
             self._cpu_primed = False
-            cpu_status = f"CPU telemetry unavailable: {_error_text(exc)}"
+            cpu_status = Text("CPU telemetry unavailable: {error}", error=_error_text(exc))
 
         ram_percent = ram_used = ram_total = ram_available = None
         ram_status = "RAM telemetry available"
@@ -93,7 +95,7 @@ class TelemetryCollector:
             ram_total = int(memory.total)
             ram_available = int(memory.available)
         except Exception as exc:
-            ram_status = f"RAM telemetry unavailable: {_error_text(exc)}"
+            ram_status = Text("RAM telemetry unavailable: {error}", error=_error_text(exc))
 
         gpus = self._sample_gpus()
         temperatures, temperature_status = self._sample_temperatures()
@@ -122,8 +124,12 @@ class TelemetryCollector:
                 for index, entry in enumerate(entries):
                     value = entry.current
                     if value is not None and math.isfinite(value):
-                        label = entry.label or f"Sensor {index + 1}"
-                        readings.append(TemperatureReading(f"{group} / {label}", float(value)))
+                        label = entry.label or Text("Sensor {index}", index=index + 1)
+                        readings.append(
+                            TemperatureReading(
+                                Text("{group} / {label}", group=group, label=label), float(value)
+                            )
+                        )
             status = (
                 "Host temperature sensors available"
                 if readings
@@ -131,7 +137,7 @@ class TelemetryCollector:
             )
             return tuple(readings), status
         except Exception as exc:
-            return (), f"Host temperature sensors unavailable: {_error_text(exc)}"
+            return (), Text("Host temperature sensors unavailable: {error}", error=_error_text(exc))
 
     def _initialize_nvml(self) -> None:
         self._nvml_attempted = True
@@ -144,7 +150,9 @@ class TelemetryCollector:
                 )
                 return
             except Exception as exc:
-                self._gpu_status = f"NVIDIA telemetry unavailable: {_error_text(exc)}"
+                self._gpu_status = Text(
+                    "NVIDIA telemetry unavailable: {error}", error=_error_text(exc)
+                )
                 return
         if self._nvml is None:
             self._gpu_status = (
@@ -155,7 +163,9 @@ class TelemetryCollector:
             self._nvml.nvmlInit()
             self._nvml_initialized = True
         except Exception as exc:
-            self._gpu_status = "NVIDIA telemetry unavailable (NVML/driver): " + _error_text(exc)
+            self._gpu_status = Text(
+                "NVIDIA telemetry unavailable (NVML/driver): {error}", error=_error_text(exc)
+            )
 
     def _sample_gpus(self) -> tuple[GPUReading, ...]:
         if not self._nvml_attempted:
@@ -166,7 +176,7 @@ class TelemetryCollector:
         try:
             count = self._nvml.nvmlDeviceGetCount()
         except Exception as exc:
-            self._gpu_status = f"NVIDIA telemetry unavailable: {_error_text(exc)}"
+            self._gpu_status = Text("NVIDIA telemetry unavailable: {error}", error=_error_text(exc))
             return ()
         if count == 0:
             self._gpu_status = "NVIDIA telemetry unavailable: no NVIDIA devices detected"
@@ -181,25 +191,31 @@ class TelemetryCollector:
                 if isinstance(name, bytes):
                     name = name.decode("utf-8", errors="replace")
             except Exception as exc:
-                failures.append(f"GPU {index}: {_error_text(exc)}")
+                failures.append(Text("GPU {index}: {error}", index=index, error=_error_text(exc)))
                 continue
 
             utilization = memory_used = memory_total = temperature = None
             try:
                 utilization = float(self._nvml.nvmlDeviceGetUtilizationRates(handle).gpu)
             except Exception as exc:
-                failures.append(f"GPU {index} utilization: {_error_text(exc)}")
+                failures.append(
+                    Text("GPU {index} utilization: {error}", index=index, error=_error_text(exc))
+                )
             try:
                 memory = self._nvml.nvmlDeviceGetMemoryInfo(handle)
                 memory_used, memory_total = int(memory.used), int(memory.total)
             except Exception as exc:
-                failures.append(f"GPU {index} memory: {_error_text(exc)}")
+                failures.append(
+                    Text("GPU {index} memory: {error}", index=index, error=_error_text(exc))
+                )
             try:
                 temperature = float(
                     self._nvml.nvmlDeviceGetTemperature(handle, self._nvml.NVML_TEMPERATURE_GPU)
                 )
             except Exception as exc:
-                failures.append(f"GPU {index} temperature: {_error_text(exc)}")
+                failures.append(
+                    Text("GPU {index} temperature: {error}", index=index, error=_error_text(exc))
+                )
             readings.append(
                 GPUReading(
                     index=index,
@@ -213,9 +229,15 @@ class TelemetryCollector:
 
         if failures:
             state = "partial" if readings else "unavailable"
-            self._gpu_status = f"NVIDIA telemetry {state}: " + "; ".join(failures)
+            self._gpu_status = Text(
+                "NVIDIA telemetry {state}: {errors}",
+                state=Text(state),
+                errors=JoinedText(failures, "; "),
+            )
         else:
-            self._gpu_status = f"NVIDIA telemetry available ({len(readings)} device(s))"
+            self._gpu_status = Text(
+                "NVIDIA telemetry available ({count} device(s))", count=len(readings)
+            )
         return tuple(readings)
 
     def close(self) -> None:

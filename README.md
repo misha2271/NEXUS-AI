@@ -245,6 +245,11 @@ paths without an installed model or NVIDIA GPU. Automated tests do not establish
 that real inference, NVIDIA drivers, or the interactive Windows desktop have been
 validated. CI results are available on the repository's Actions page.
 
+PySide6 is currently limited to versions below 6.12: with 6.12.0 on Linux and
+Python 3.11, the full suite passes but interpreter shutdown aborts with a native
+reference-count error. The same suite exits successfully with PySide6 6.11.3.
+Keep this compatibility bound until the affected runtime is verified again.
+
 Before distributing to Windows users, manually verify on Windows 11:
 
 1. Launch the app, watch live CPU/RAM changes while running another program, and

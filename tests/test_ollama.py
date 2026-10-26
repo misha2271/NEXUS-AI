@@ -222,3 +222,48 @@ def test_invalid_model_rejected_without_network():
 def test_invalid_or_credential_bearing_base_url_rejected(url):
     with pytest.raises(ValueError):
         OllamaClient(url)
+
+
+def test_explicit_unload_uses_ollama_supported_api_without_generating_text():
+    seen = []
+
+    def handle(request):
+        seen.append(request)
+        assert request.url.path == "/api/generate"
+        assert request.method == "POST"
+        assert json.loads(request.content) == {
+            "model": "qwen3:8b",
+            "prompt": "",
+            "stream": False,
+            "keep_alive": 0,
+        }
+        return httpx.Response(200, json={"done": True, "done_reason": "unload"})
+
+    with client_for(handle) as client:
+        assert client.unload_model(" qwen3:8b ") is None
+    assert len(seen) == 1
+
+
+def test_unload_rejects_missing_model_without_network():
+    with client_for(lambda _: pytest.fail("unexpected request")) as client:
+        with pytest.raises(OllamaError, match="Select an installed model"):
+            client.unload_model(" ")
+
+
+def test_unload_never_reports_success_without_done_marker():
+    with client_for(lambda _: httpx.Response(200, json={"done": False})) as client:
+        with pytest.raises(OllamaError, match="done"):
+            client.unload_model("qwen3:8b")
+
+
+def test_unload_propagates_network_errors_and_http_errors():
+    with client_for(lambda _: httpx.Response(503, json={"error": "service down"})) as client:
+        with pytest.raises(OllamaError, match="503"):
+            client.unload_model("qwen3:8b")
+
+    def offline(_):
+        raise httpx.ConnectError("offline")
+
+    with client_for(offline) as client:
+        with pytest.raises(OllamaError, match="Cannot reach Ollama"):
+            client.unload_model("qwen3:8b")

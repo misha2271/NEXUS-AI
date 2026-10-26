@@ -1,0 +1,2 @@
+Codex GitHub connection test.
+This file verifies branch push and pull request access.

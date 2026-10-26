@@ -35,9 +35,7 @@ def test_only_executable_filenames_are_allowed(bad):
 
 
 def test_names_are_case_insensitive_and_explicit():
-    assert configured_games(["HogwartsLegacy.exe", "hogwartslegacy.EXE"]) == {
-        "hogwartslegacy.exe"
-    }
+    assert configured_games(["HogwartsLegacy.exe", "hogwartslegacy.EXE"]) == {"hogwartslegacy.exe"}
     assert normalize_executable("HogwartsLegacy.exe") == "hogwartslegacy.exe"
 
 
@@ -53,9 +51,7 @@ def test_detector_matches_only_configured_process_names():
             ]
         )
 
-    assert running_games(["HogwartsLegacy.exe"], process_iter=fake_iter) == {
-        "hogwartslegacy.exe"
-    }
+    assert running_games(["HogwartsLegacy.exe"], process_iter=fake_iter) == {"hogwartslegacy.exe"}
 
 
 def test_detector_skips_inaccessible_processes():

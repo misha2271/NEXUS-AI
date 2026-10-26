@@ -93,6 +93,14 @@ def run_self_test(app: QApplication, report_path: Path) -> int:
             or not 0 <= snapshot.ram_available_bytes <= snapshot.ram_total_bytes
         ):
             raise RuntimeError("Bundled psutil returned invalid memory telemetry.")
+        window._show_telemetry(snapshot)
+        app.processEvents()
+        if report["frozen"] and sys.platform == "win32":
+            screenshot_path = Path(report_path).with_suffix(".png")
+            screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+            if not window.grab().save(str(screenshot_path)):
+                raise RuntimeError("The frozen UI screenshot could not be saved.")
+            report["screenshot_path"] = str(screenshot_path)
     except Exception as exc:
         errors.append(str(exc) or type(exc).__name__)
     finally:

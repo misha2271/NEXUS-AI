@@ -8,7 +8,9 @@ measurements. The first CPU sample only primes psutil's interval counter.
 from __future__ import annotations
 
 import importlib
-from dataclasses import dataclass
+import math
+import time
+from dataclasses import dataclass, field
 from typing import Any
 
 import psutil
@@ -27,6 +29,12 @@ class GPUReading:
 
 
 @dataclass(frozen=True)
+class TemperatureReading:
+    name: str
+    current_c: float
+
+
+@dataclass(frozen=True)
 class TelemetrySnapshot:
     cpu_percent: float | None
     ram_percent: float | None
@@ -37,6 +45,9 @@ class TelemetrySnapshot:
     gpu_status: str
     cpu_status: str = "CPU telemetry available"
     ram_status: str = "RAM telemetry available"
+    temperatures: tuple[TemperatureReading, ...] = ()
+    temperature_status: str = "Temperature sensors unavailable on this platform"
+    sampled_at: float = field(default_factory=time.monotonic)
 
 
 class TelemetryCollector:
@@ -85,6 +96,7 @@ class TelemetryCollector:
             ram_status = f"RAM telemetry unavailable: {_error_text(exc)}"
 
         gpus = self._sample_gpus()
+        temperatures, temperature_status = self._sample_temperatures()
         return TelemetrySnapshot(
             cpu_percent=cpu_percent,
             ram_percent=ram_percent,
@@ -95,7 +107,31 @@ class TelemetryCollector:
             gpu_status=self._gpu_status,
             cpu_status=cpu_status,
             ram_status=ram_status,
+            temperatures=temperatures,
+            temperature_status=temperature_status,
         )
+
+    def _sample_temperatures(self) -> tuple[tuple[TemperatureReading, ...], str]:
+        reader = getattr(self._psutil, "sensors_temperatures", None)
+        if reader is None:
+            return (), "Host temperature sensors unavailable on this platform"
+        try:
+            sensors = reader(fahrenheit=False)
+            readings = []
+            for group, entries in sensors.items():
+                for index, entry in enumerate(entries):
+                    value = entry.current
+                    if value is not None and math.isfinite(value):
+                        label = entry.label or f"Sensor {index + 1}"
+                        readings.append(TemperatureReading(f"{group} / {label}", float(value)))
+            status = (
+                "Host temperature sensors available"
+                if readings
+                else "No readable host temperature sensors"
+            )
+            return tuple(readings), status
+        except Exception as exc:
+            return (), f"Host temperature sensors unavailable: {_error_text(exc)}"
 
     def _initialize_nvml(self) -> None:
         self._nvml_attempted = True

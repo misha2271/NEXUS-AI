@@ -40,6 +40,10 @@ class OllamaJob(QRunnable):
         self.cancel_event = Event()
         self.signals = JobSignals()
 
+    def cancel(self) -> None:
+        """Thread-safe cooperative request; never close an HTTP transport on the UI thread."""
+        self.cancel_event.set()
+
     @Slot()
     def run(self) -> None:
         try:
@@ -49,7 +53,9 @@ class OllamaJob(QRunnable):
                 return
             with self.client_factory(self.base_url) as client:
                 if self.kind == "models":
-                    self.signals.result.emit(self, client.list_models())
+                    models = client.list_models()
+                    if not self.cancel_event.is_set():
+                        self.signals.result.emit(self, models)
                 else:
                     assert self.policy is not None
                     for chunk in client.stream_chat(
@@ -64,7 +70,11 @@ class OllamaJob(QRunnable):
                         self.signals.chunk.emit(self, chunk)
                     self.signals.result.emit(self, None)
         except Exception as exc:
-            self.signals.failed.emit(self, str(exc) or type(exc).__name__)
+            if self.cancel_event.is_set():
+                if self.kind == "chat":
+                    self.signals.result.emit(self, None)
+            else:
+                self.signals.failed.emit(self, str(exc) or type(exc).__name__)
         finally:
             self.signals.finished.emit(self)
 
@@ -80,9 +90,12 @@ class TelemetryWorker(QObject):
         self._collector: TelemetryCollector | None = None
         self._timer: QTimer | None = None
         self._interval = 1000
+        self._stopped = False
 
     @Slot()
     def start(self) -> None:
+        if self._stopped:
+            return
         try:
             self._collector = self._factory()
         except Exception as exc:
@@ -111,6 +124,9 @@ class TelemetryWorker(QObject):
 
     @Slot()
     def stop(self) -> None:
+        if self._stopped:
+            return
+        self._stopped = True
         if self._timer is not None:
             self._timer.stop()
         try:

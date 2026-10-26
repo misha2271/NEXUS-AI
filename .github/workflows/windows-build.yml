@@ -2,7 +2,7 @@ name: Windows executable builds
 
 on:
   push:
-    branches: [main, "feature/**"]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -47,11 +47,11 @@ jobs:
         if: always()
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          git archive --format=zip --prefix=NEXUS-AI-0.3.0/ --output=dist/NEXUS-AI-0.3.0-source.zip HEAD
+          git archive --format=zip --prefix=NEXUS-AI-0.4.0/ --output=dist/NEXUS-AI-0.4.0-source.zip HEAD
       - name: Upload standalone onefile EXE
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.3.0-windows-x64-onefile
+          name: NEXUS-AI-0.4.0-windows-x64-onefile
           path: dist/NEXUS-AI.exe
           compression-level: 0
           if-no-files-found: error
@@ -59,7 +59,7 @@ jobs:
       - name: Upload portable onedir ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.3.0-windows-x64-portable
+          name: NEXUS-AI-0.4.0-windows-x64-portable
           path: dist/NEXUS-AI-Portable.zip
           compression-level: 0
           if-no-files-found: error
@@ -67,7 +67,7 @@ jobs:
       - name: Upload binary checksums
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.3.0-windows-x64-checksums
+          name: NEXUS-AI-0.4.0-windows-x64-checksums
           path: dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
@@ -75,8 +75,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.3.0-source
-          path: dist/NEXUS-AI-0.3.0-source.zip
+          name: NEXUS-AI-0.4.0-source
+          path: dist/NEXUS-AI-0.4.0-source.zip
           compression-level: 0
           if-no-files-found: error
           retention-days: 14
@@ -84,7 +84,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.3.0-windows-x64-smoke-reports
+          name: NEXUS-AI-0.4.0-windows-x64-smoke-reports
           path: dist/smoke/
           if-no-files-found: warn
           retention-days: 14

@@ -1,8 +1,8 @@
-# NEXUS AI 0.3
+# NEXUS AI 0.4
 
 A Windows 11 desktop application for local Ollama chat and real hardware monitoring.
 Built with Python 3.11+ and PySide6, with a dark interface and background workers
-for network requests and telemetry.
+for network requests and telemetry, with sidebar workspaces and bounded historical charts.
 
 - Live CPU utilization and RAM usage from `psutil`.
 - Optional NVIDIA utilization, VRAM usage, and temperature from NVML.
@@ -14,6 +14,38 @@ Telemetry is never simulated. Missing NVIDIA support displays an unavailable
 status; it does not prevent CPU/RAM monitoring or chat. Missing Ollama displays a
 connection error while the rest of the application remains usable.
 
+## v0.4 dashboard
+
+- **Overview:** dark, responsive Qt dashboard with real CPU and RAM readings,
+  optional per-device NVIDIA utilization/VRAM/temperature through NVML, and named
+  host temperature sensors through `psutil.sensors_temperatures` where supported.
+- **History:** six Qt-painted charts for CPU, RAM, GPU, VRAM, host temperatures,
+  and GPU temperatures. History is session-only, bounded to 300 samples and ten
+  minutes; missing sensors produce gaps, never made-up zeros. The actual captured
+  duration is displayed. GPU cards summarize the first reported device; detail
+  cards and charts retain all reported GPUs.
+- **Assistant:** dedicated streaming chat workspace with model selection, model
+  size tooltips, copy/clear, Ctrl+Enter to send, Escape to stop, and batched text
+  rendering. Persistent endpoint/model preferences and all four existing profiles
+  remain compatible with v0.3 settings files.
+- **Device workspaces:** Gaming, RGB Studio, Logitech G560, Gamepad Lab, SSD Health,
+  and Update Center have explicit module/provider contracts and unavailable-state
+  pages. Gaming can apply the existing inference profile. No game detection, FPS
+  capture, lighting, speaker, gamepad, SMART, firmware, or updater SDK is implemented.
+  RGB and fan writes stay disabled; no placeholder is advertised as working.
+
+Windows CPU temperatures are **unavailable without a supported sensor backend**;
+this version does not bundle a kernel driver or LibreHardwareMonitor integration.
+NVIDIA readings require real NVML support; AMD/Intel GPU telemetry is not implemented.
+
+See [architecture and limitations](docs/architecture.md) for threading and provider
+contracts. [Screenshots](docs/screenshots/README.md) are real offscreen Qt captures
+from the Linux development host, with no fabricated GPU data or assistant replies.
+Native frozen Windows probes also save UI screenshots beside their smoke reports.
+
+![Dashboard with actual host telemetry](docs/screenshots/overview.png)
+![Assistant with the actual unavailable Ollama endpoint](docs/screenshots/assistant.png)
+
 ## Run a standalone Windows build
 
 The repository includes native Windows PyInstaller build configuration for x64
@@ -23,11 +55,11 @@ adding these scripts or passing tests on Linux does not produce a Windows binary
 From a successful **Windows executable builds** run on the repository's Actions
 page, download either of these artifacts:
 
-- **`NEXUS-AI-0.3.0-windows-x64-onefile`**: extract the artifact download and run
+- **`NEXUS-AI-0.4.0-windows-x64-onefile`**: extract the artifact download and run
   `NEXUS-AI.exe`. This variant contains the application, Python runtime, and Qt
   libraries in a single EXE and extracts its runtime to a temporary folder on
   launch. Startup can be slower than the directory build.
-- **`NEXUS-AI-0.3.0-windows-x64-portable`**: extract the artifact download, then
+- **`NEXUS-AI-0.4.0-windows-x64-portable`**: extract the artifact download, then
   extract `NEXUS-AI-Portable.zip`. Run
   `NEXUS-AI\NEXUS-AI.exe` and keep the entire `NEXUS-AI` directory together.
   The EXE in this variant depends on its accompanying files and is not standalone
@@ -140,8 +172,9 @@ Windows 11 machine without Python or validating real Ollama/NVIDIA hardware.
 The workflow `.github/workflows/windows-build.yml` performs these native builds
 on `windows-latest` with Python 3.11 x64. It runs tests and lint first, then
 uploads the onefile EXE, portable ZIP, checksums, and smoke reports. It also
-publishes `NEXUS-AI-0.3.0-source.zip`, containing the complete tracked source,
-tests, packaging scripts, and workflows. Artifact retention is 14 days. A failed
+publishes `NEXUS-AI-0.4.0-source.zip`, containing the complete tracked source,
+tests, packaging scripts, and workflows. It runs for pull requests into `main`, pushes to `main`, and manual dispatch;
+feature-branch pushes do not duplicate the PR build. Artifact retention is 14 days. A failed
 build does not publish binary artifacts; source and available diagnostics can
 still be downloaded. Check the run status before treating any binary as built.
 
@@ -275,7 +308,9 @@ src/nexus_ai/
   telemetry.py    psutil sampling and optional NVML integration
   ollama.py       Model discovery and streamed REST chat
   workers.py      Qt adapters for background HTTP and telemetry work
-  ui/             Qt desktop interface
+  history.py      Bounded time-series with unavailable-reading gaps
+  modules.py      Default-deny integration contracts and workspace registry
+  ui/             Responsive dashboard, painted charts, assistant and module pages
 tests/            Service and UI regression tests
 .github/workflows/ci.yml
 .github/workflows/windows-build.yml
@@ -295,7 +330,7 @@ pyproject.toml
   Model availability is reported by Ollama, not inferred from the hardware.
 - **NVIDIA unavailable:** install the optional binding and supported drivers;
   restart the app after changing the driver or dependency. Integrated, AMD, and
-  Intel GPU telemetry is outside v0.3 scope.
+  Intel GPU telemetry is outside v0.4 scope.
 - **A metric is unavailable:** some NVML counters are unsupported on particular
   devices or drivers. Unsupported counters are shown as unavailable, not zero.
 - **Large-model errors:** reduce the model size or context/profile budget. This

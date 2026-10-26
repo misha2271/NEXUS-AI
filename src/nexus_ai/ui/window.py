@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import replace
 
 from PySide6.QtCore import Qt, QThread, QThreadPool, QTimer, Signal, Slot
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -20,38 +22,30 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QScrollArea,
-    QSplitter,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from nexus_ai import __version__
+from nexus_ai.history import TelemetryHistory
+from nexus_ai.modules import MODULES, IntegrationRegistry
 from nexus_ai.ollama import OllamaClient
 from nexus_ai.profiles import PROFILE_NAMES, InferencePolicy, resolve_policy
 from nexus_ai.settings import Settings, SettingsStore, validate_settings
 from nexus_ai.telemetry import TelemetryCollector, TelemetrySnapshot
+from nexus_ai.ui.dashboard import (
+    COLORS,
+    HistoryChart,
+    ModulePage,
+    ResponsiveGrid,
+    SectionHeader,
+    Sidebar,
+    label,
+    scroll_page,
+)
+from nexus_ai.ui.theme import STYLE
 from nexus_ai.workers import OllamaJob, TelemetryWorker
-
-_STYLE = """
-QWidget { background: #10151f; color: #edf2f7; font-family: 'Segoe UI', sans-serif;
-          font-size: 13px; }
-QLabel#title { font-size: 25px; font-weight: 700; color: #a5b4fc; }
-QLabel#subtitle, QLabel#muted { color: #a6b2c7; }
-QFrame#panel { background: #172031; border: 1px solid #2a354b; border-radius: 10px; }
-QFrame#panel QLabel { background: transparent; }
-QPlainTextEdit, QLineEdit, QComboBox { background: #0b1019; border: 1px solid #36445f;
-    border-radius: 6px; padding: 8px; selection-background-color: #4263eb; }
-QPlainTextEdit:focus, QLineEdit:focus, QComboBox:focus { border-color: #818cf8; }
-QPushButton { background: #283650; border: 1px solid #3c4c69; border-radius: 6px;
-              padding: 8px 14px; }
-QPushButton:hover { background: #35476b; }
-QPushButton#primary { background: #4f46e5; border-color: #6366f1; }
-QPushButton:disabled { color: #78849b; background: #1b2434; border-color: #283246; }
-QProgressBar { background: #0b1019; border: 0; border-radius: 4px; height: 9px; }
-QProgressBar::chunk { background: #818cf8; border-radius: 4px; }
-QSplitter::handle { background: #263248; }
-QScrollArea { border: 0; }
-"""
 
 
 def _gib(value: int | None) -> str:
@@ -63,9 +57,12 @@ class MetricCard(QFrame):
         super().__init__()
         self.setObjectName("panel")
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(title))
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(12)
+        layout.addWidget(label(title, "eyebrow"))
         self.value = QLabel("Waiting for telemetry…")
         self.value.setWordWrap(True)
+        self.value.setObjectName("metricValue")
         layout.addWidget(self.value)
         self.bar = QProgressBar()
         self.bar.setRange(0, 100)
@@ -74,7 +71,9 @@ class MetricCard(QFrame):
         layout.addWidget(self.bar)
 
     def update_metric(self, percent: float | None, detail: str) -> None:
+        self.value.setTextFormat(Qt.TextFormat.PlainText)
         self.value.setText(detail)
+        self.value.setStyleSheet("font-size: 13px;" if len(detail) > 40 else "")
         self.bar.setVisible(percent is not None)
         if percent is not None:
             self.bar.setValue(round(percent))
@@ -100,6 +99,11 @@ class MainWindow(QMainWindow):
         self._messages: list[dict[str, str]] = []
         self._pending_user = ""
         self._draft_response = ""
+        self._pending_chunks: list[str] = []
+        self._render_timer = QTimer(self)
+        self._render_timer.setSingleShot(True)
+        self._render_timer.setInterval(30)
+        self._render_timer.timeout.connect(self._flush_chunks)
         self._chat_job: OllamaJob | None = None
         self._discovery_job: OllamaJob | None = None
         self._jobs: set[OllamaJob] = set()
@@ -111,10 +115,10 @@ class MainWindow(QMainWindow):
         self._shutdown_timer = QTimer(self)
         self._shutdown_timer.setInterval(50)
         self._shutdown_timer.timeout.connect(self._check_shutdown)
-        self.setWindowTitle("NEXUS AI · v0.3")
-        self.resize(1160, 780)
-        self.setMinimumSize(820, 560)
-        self.setStyleSheet(_STYLE)
+        self.setWindowTitle(f"NEXUS AI · v{__version__}")
+        self.resize(1400, 940)
+        self.setMinimumSize(720, 540)
+        self.setStyleSheet(STYLE)
         self._build_ui()
         self._apply_policy()
         if store.warning:
@@ -124,69 +128,161 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, self.refresh_models)
 
     def _build_ui(self) -> None:
+        self.history = TelemetryHistory()
+        self.integrations = IntegrationRegistry()
         central = QWidget()
-        root = QVBoxLayout(central)
-        root.setContentsMargins(22, 18, 22, 18)
-        root.setSpacing(14)
-        heading = QHBoxLayout()
-        title = QLabel("NEXUS AI")
-        title.setObjectName("title")
-        heading.addWidget(title)
-        subtitle = QLabel("v0.3  /  Local intelligence. Live telemetry.")
-        subtitle.setObjectName("subtitle")
-        heading.addWidget(subtitle)
-        heading.addStretch()
-        self.settings_button = QPushButton("Settings")
-        self.settings_button.clicked.connect(self.open_settings)
-        heading.addWidget(self.settings_button)
-        root.addLayout(heading)
-
-        profiles = QHBoxLayout()
-        profiles.addWidget(QLabel("Performance profile"))
+        root = QHBoxLayout(central)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        self.sidebar = Sidebar()
+        root.addWidget(self.sidebar)
+        workspace = QWidget()
+        body = QVBoxLayout(workspace)
+        body.setContentsMargins(24, 20, 24, 16)
+        body.setSpacing(18)
+        toolbar = QHBoxLayout()
+        self.breadcrumb = label("WORKSPACE / OVERVIEW", "breadcrumb")
+        toolbar.addWidget(self.breadcrumb, 1)
+        toolbar.addWidget(label("PROFILE", "eyebrow"))
         self.profile_combo = QComboBox()
+        self.profile_combo.setAccessibleName("Performance profile")
         self.profile_combo.addItems(PROFILE_NAMES)
         self.profile_combo.setCurrentText(self.settings.profile)
         self.profile_combo.currentTextChanged.connect(self._profile_changed)
-        profiles.addWidget(self.profile_combo)
-        self.policy_label = QLabel()
-        self.policy_label.setWordWrap(True)
-        self.policy_label.setObjectName("muted")
-        profiles.addWidget(self.policy_label, 1)
-        root.addLayout(profiles)
-        scope = QLabel(
-            "Profiles tune inference requests and monitoring. Changes apply to the next reply."
+        toolbar.addWidget(self.profile_combo)
+        self.settings_button = QPushButton("Settings")
+        self.settings_button.clicked.connect(self.open_settings)
+        toolbar.addWidget(self.settings_button)
+        body.addLayout(toolbar)
+        self.policy_label = label("")
+        self.policy_label.setToolTip("Profiles apply to the next Ollama request, not OS settings.")
+        body.addWidget(self.policy_label)
+        self.stack = QStackedWidget()
+        self.pages: dict[str, QWidget] = {}
+        self.module_pages: dict[str, ModulePage] = {}
+        self._add_page("overview", "Overview", self._build_dashboard())
+        self._add_page("assistant", "Assistant", self._build_assistant())
+        for spec in MODULES:
+            page = ModulePage(spec)
+            if page.gaming_button is not None:
+                page.gaming_button.clicked.connect(
+                    lambda: self.profile_combo.setCurrentText("Gaming")
+                )
+            self.module_pages[spec.key] = page
+            self._add_page(spec.key, spec.title, scroll_page(page))
+        self.sidebar.finish()
+        body.addWidget(self.stack, 1)
+        self.settings_status = label("")
+        body.addWidget(self.settings_status)
+        root.addWidget(workspace, 1)
+        self.setCentralWidget(central)
+        self.navigate("overview")
+
+    def _add_page(self, key: str, title: str, page: QWidget) -> None:
+        self.pages[key] = page
+        self.stack.addWidget(page)
+        self.sidebar.add_route(key, title).clicked.connect(lambda: self.navigate(key))
+
+    def navigate(self, key: str) -> None:
+        if key not in self.pages:
+            raise ValueError(f"Unknown workspace: {key}")
+        self.stack.setCurrentWidget(self.pages[key])
+        for name, button in self.sidebar.buttons.items():
+            button.setChecked(name == key)
+        self.breadcrumb.setText(f"WORKSPACE / {self.sidebar.buttons[key].text().upper()}")
+
+    def _build_dashboard(self) -> QWidget:
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 8, 0)
+        layout.setSpacing(16)
+        layout.addWidget(
+            SectionHeader("System overview", "Live host signals. No simulated metrics.")
         )
-        scope.setObjectName("muted")
-        root.addWidget(scope)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.cpu_card = MetricCard("CPU / UTILIZATION")
+        self.ram_card = MetricCard("RAM / SYSTEM MEMORY")
+        self.gpu_card = MetricCard("GPU / NVIDIA UTILIZATION")
+        self.vram_card = MetricCard("VRAM / DEVICE MEMORY")
+        self.metric_grid = ResponsiveGrid(
+            [self.cpu_card, self.ram_card, self.gpu_card, self.vram_card],
+            wide_columns=4,
+            breakpoint=1000,
+            narrow_columns=2,
+        )
+        layout.addWidget(self.metric_grid)
+        self.history_status = label("History begins with this session · up to 300 samples / 10 min")
+        layout.addWidget(self.history_status)
+        self.charts = [
+            HistoryChart("CPU utilization / %", self.history, "cpu", COLORS[0]),
+            HistoryChart("Memory usage / %", self.history, "ram", COLORS[1]),
+            HistoryChart("GPU utilization / % · all devices", self.history, "gpu:", COLORS[2]),
+            HistoryChart("VRAM usage / % · all devices", self.history, "vram:", COLORS[3]),
+            HistoryChart("Host temperatures / °C", self.history, "temperature:", COLORS[2]),
+            HistoryChart("GPU temperatures / °C", self.history, "gpu_temp:", COLORS[0]),
+        ]
+        self.chart_grid = ResponsiveGrid(self.charts, wide_columns=2, breakpoint=720)
+        layout.addWidget(self.chart_grid)
+        thermal = QFrame()
+        thermal.setObjectName("panel")
+        thermal_layout = QVBoxLayout(thermal)
+        thermal_layout.setContentsMargins(18, 16, 18, 16)
+        thermal_layout.addWidget(label("TEMPERATURE SENSORS", "eyebrow"))
+        self.temperature_status = label("Waiting for real sensor readings…")
+        thermal_layout.addWidget(self.temperature_status)
+        self.temperature_values = label("", "body")
+        thermal_layout.addWidget(self.temperature_values)
+        self.fan_button = QPushButton("Fan controls · no validated SDK")
+        self.fan_button.setEnabled(False)
+        thermal_layout.addWidget(self.fan_button)
+        layout.addWidget(thermal)
+        self.gpu_status = label("Checking optional NVIDIA telemetry…")
+        layout.addWidget(self.gpu_status)
+        self._gpu_container = QWidget()
+        self._gpu_layout = QVBoxLayout(self._gpu_container)
+        self._gpu_layout.setContentsMargins(0, 0, 0, 0)
+        self._gpu_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self._gpu_cards: dict[int, MetricCard] = {}
+        layout.addWidget(self._gpu_container)
+        layout.addStretch()
+        return scroll_page(content)
+
+    def _build_assistant(self) -> QWidget:
         chat = QWidget()
         chat_layout = QVBoxLayout(chat)
-        chat_layout.setContentsMargins(0, 0, 8, 0)
+        chat_layout.setContentsMargins(0, 0, 0, 0)
+        chat_layout.setSpacing(14)
+        chat_layout.addWidget(
+            SectionHeader(
+                "Your local assistant",
+                "Streamed from your Ollama server. Your model, your workspace.",
+            )
+        )
         model_row = QHBoxLayout()
-        model_row.addWidget(QLabel("Ollama model"))
+        model_row.addWidget(label("MODEL", "eyebrow"))
         self.model_combo = QComboBox()
-        self.model_combo.setMinimumWidth(160)
+        self.model_combo.setMinimumWidth(100)
+        self.model_combo.setAccessibleName("Installed Ollama model")
         self.model_combo.currentIndexChanged.connect(self._model_changed)
         model_row.addWidget(self.model_combo, 1)
         self.refresh_button = QPushButton("Refresh models")
         self.refresh_button.clicked.connect(self.refresh_models)
         model_row.addWidget(self.refresh_button)
         chat_layout.addLayout(model_row)
-        self.connection_status = QLabel("Connect to Ollama to discover installed models.")
-        self.connection_status.setWordWrap(True)
-        self.connection_status.setTextFormat(Qt.TextFormat.PlainText)
+        self.connection_status = label("Connect to Ollama to discover installed models.")
         chat_layout.addWidget(self.connection_status)
         self.transcript = QPlainTextEdit()
+        self.transcript.setObjectName("transcript")
         self.transcript.setReadOnly(True)
         self.transcript.setPlaceholderText(
-            "Your conversation stays in this session. Start with a message below."
+            "A clear space to think.\n\nChoose an installed model, then start a conversation.\n"
+            "History stays in this session; prompts go to your configured Ollama server."
         )
         self.transcript.document().setMaximumBlockCount(10000)
         self.transcript.setAccessibleName("Chat transcript")
         chat_layout.addWidget(self.transcript, 1)
         self.prompt = QPlainTextEdit()
         self.prompt.setPlaceholderText("Ask NEXUS…  (Ctrl+Enter to send)")
-        self.prompt.setFixedHeight(100)
+        self.prompt.setFixedHeight(90)
         self.prompt.setAccessibleName("Message")
         self.prompt.textChanged.connect(self._update_controls)
         chat_layout.addWidget(self.prompt)
@@ -194,6 +290,11 @@ class MainWindow(QMainWindow):
         self.clear_button = QPushButton("Clear chat")
         self.clear_button.clicked.connect(self._clear_chat)
         actions.addWidget(self.clear_button)
+        self.copy_button = QPushButton("Copy")
+        self.copy_button.clicked.connect(
+            lambda: QApplication.clipboard().setText(self.transcript.toPlainText())
+        )
+        actions.addWidget(self.copy_button)
         actions.addStretch()
         self.stop_button = QPushButton("Stop")
         self.stop_button.setEnabled(False)
@@ -207,39 +308,14 @@ class MainWindow(QMainWindow):
         chat_layout.addLayout(actions)
         self._send_shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
         self._send_shortcut.activated.connect(self.send_message)
-        splitter.addWidget(chat)
+        self._stop_shortcut = QShortcut(QKeySequence("Escape"), self)
+        self._stop_shortcut.activated.connect(self.stop_generation)
+        return chat
 
-        hardware = QWidget()
-        hardware.setMinimumWidth(245)
-        hardware_layout = QVBoxLayout(hardware)
-        hardware_layout.setContentsMargins(8, 0, 0, 0)
-        hardware_layout.addWidget(QLabel("LIVE HARDWARE"))
-        self.cpu_card = MetricCard("CPU utilization")
-        self.ram_card = MetricCard("System memory")
-        hardware_layout.addWidget(self.cpu_card)
-        hardware_layout.addWidget(self.ram_card)
-        self.gpu_status = QLabel("Checking optional NVIDIA telemetry…")
-        self.gpu_status.setWordWrap(True)
-        self.gpu_status.setTextFormat(Qt.TextFormat.PlainText)
-        hardware_layout.addWidget(self.gpu_status)
-        gpu_scroll = QScrollArea()
-        gpu_scroll.setWidgetResizable(True)
-        self._gpu_container = QWidget()
-        self._gpu_layout = QVBoxLayout(self._gpu_container)
-        self._gpu_layout.setContentsMargins(0, 0, 0, 0)
-        self._gpu_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        gpu_scroll.setWidget(self._gpu_container)
-        self._gpu_cards: dict[int, MetricCard] = {}
-        hardware_layout.addWidget(gpu_scroll, 1)
-        splitter.addWidget(hardware)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 1)
-        root.addWidget(splitter, 1)
-        self.settings_status = QLabel()
-        self.settings_status.setWordWrap(True)
-        self.settings_status.setTextFormat(Qt.TextFormat.PlainText)
-        root.addWidget(self.settings_status)
-        self.setCentralWidget(central)
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "sidebar"):
+            self.sidebar.setFixedWidth(166 if self.width() < 980 else 208)
 
     def _start_monitor(self, factory: Callable[[], TelemetryCollector]) -> None:
         self._monitor_thread = QThread(self)
@@ -355,6 +431,7 @@ class MainWindow(QMainWindow):
         model = self.model_combo.currentData()
         if self._closing or self._chat_job or self._discovery_job or not prompt or not model:
             return
+        self.navigate("assistant")
         self._persist(replace(self.settings, model=model))
         # Keep context bounded; larger context windows still depend on the selected model.
         messages = self._messages[-40:] + [{"role": "user", "content": prompt}]
@@ -379,6 +456,17 @@ class MainWindow(QMainWindow):
         if job is not self._chat_job or self._closing or job.cancel_event.is_set():
             return
         self._draft_response += text
+        self._pending_chunks.append(text)
+        if not self._render_timer.isActive():
+            self._render_timer.start()
+
+    @Slot()
+    def _flush_chunks(self) -> None:
+        self._render_timer.stop()
+        text = "".join(self._pending_chunks)
+        self._pending_chunks.clear()
+        if not text or self._closing:
+            return
         cursor = self.transcript.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertText(text)
@@ -394,6 +482,11 @@ class MainWindow(QMainWindow):
             self.model_combo.blockSignals(True)
             for model in models:
                 self.model_combo.addItem(model.name, model.name)
+                self.model_combo.setItemData(
+                    self.model_combo.count() - 1,
+                    f"{model.name} · {_gib(model.size_bytes)} download size",
+                    Qt.ItemDataRole.ToolTipRole,
+                )
             selected = self.model_combo.findData(self.settings.model)
             if selected >= 0:
                 self.model_combo.setCurrentIndex(selected)
@@ -407,6 +500,7 @@ class MainWindow(QMainWindow):
                     "No installed models. Run 'ollama pull llama3.2:3b', then refresh models."
                 )
         elif job is self._chat_job:
+            self._flush_chunks()
             if job.cancel_event.is_set():
                 self.transcript.appendPlainText(
                     "\n[Generation stopped; partial reply excluded from context.]\n"
@@ -434,6 +528,7 @@ class MainWindow(QMainWindow):
             return
         self.connection_status.setText(error)
         if job is self._chat_job:
+            self._flush_chunks()
             self.transcript.appendPlainText(f"\n[Reply failed: {error}]\n")
             if not self.prompt.toPlainText():
                 self.prompt.setPlainText(self._pending_user)
@@ -442,6 +537,7 @@ class MainWindow(QMainWindow):
     def _job_finished(self, job: OllamaJob) -> None:
         self._jobs.discard(job)
         if job is self._chat_job:
+            self._flush_chunks()
             self._chat_job = None
             self._pending_user = ""
         if job is self._discovery_job:
@@ -451,7 +547,8 @@ class MainWindow(QMainWindow):
     @Slot()
     def stop_generation(self) -> None:
         if self._chat_job is not None:
-            self._chat_job.cancel_event.set()
+            self._flush_chunks()
+            self._chat_job.cancel()
             self.stop_button.setEnabled(False)
             self.connection_status.setText(
                 "Stopping… waiting for the next response chunk or network timeout."
@@ -477,6 +574,10 @@ class MainWindow(QMainWindow):
         self.clear_button.setEnabled(not busy)
         self.profile_combo.setEnabled(not self._closing)
         self.prompt.setEnabled(not self._closing)
+        self.copy_button.setEnabled(not self._closing)
+        for button in self.sidebar.buttons.values():
+            button.setEnabled(not self._closing)
+        self.module_pages["gaming"].gaming_button.setEnabled(not self._closing)
         self.stop_button.setEnabled(
             self._chat_job is not None
             and not self._chat_job.cancel_event.is_set()
@@ -485,7 +586,48 @@ class MainWindow(QMainWindow):
 
     @Slot(object)
     def _show_telemetry(self, snapshot: TelemetrySnapshot) -> None:
+        if self._closing:
+            return
         self._snapshot = snapshot
+        self.history.append(snapshot)
+        for chart in self.charts:
+            keys = self.history.keys(chart.prefix)
+            chart.setToolTip("\n".join(keys) or "No sensor readings available")
+            chart.setAccessibleDescription("Historical series: " + ", ".join(keys))
+            chart.update()
+        self.history_status.setText(
+            f"{len(self.history.points)} real samples · up to 300 samples / 10 min · "
+            "GPU lines follow device index"
+        )
+        gpu = snapshot.gpus[0] if snapshot.gpus else None
+        self.gpu_card.update_metric(
+            gpu.utilization_percent if gpu else None,
+            (
+                f"{gpu.utilization_percent:.1f}% · {gpu.name}"
+                if gpu and gpu.utilization_percent is not None
+                else "GPU unavailable"
+            ),
+        )
+        vram = (
+            100 * gpu.memory_used_bytes / gpu.memory_total_bytes
+            if gpu and gpu.memory_used_bytes is not None and gpu.memory_total_bytes
+            else None
+        )
+        self.vram_card.update_metric(
+            vram,
+            f"{_gib(gpu.memory_used_bytes)} / {_gib(gpu.memory_total_bytes)}"
+            if gpu
+            else "VRAM unavailable",
+        )
+        self.gpu_card.setToolTip("First reported GPU; all devices are shown below and in charts.")
+        self.vram_card.setToolTip("Memory of first reported GPU; all devices are charted.")
+        self.temperature_status.setText(snapshot.temperature_status)
+        self.temperature_values.setText(
+            "\n".join(
+                f"{sensor.name}: {sensor.current_c:.1f} °C" for sensor in snapshot.temperatures
+            )
+            or "No host sensor data. Windows CPU temperatures require a supported sensor provider."
+        )
         cpu = snapshot.cpu_percent
         cpu_text = f"{cpu:.1f}%" if cpu is not None else snapshot.cpu_status
         self.cpu_card.update_metric(cpu, cpu_text)
@@ -525,6 +667,13 @@ class MainWindow(QMainWindow):
 
     @Slot(str)
     def _telemetry_failed(self, error: str) -> None:
+        self.history.append_values(time.monotonic(), {})
+        for chart in self.charts:
+            chart.update()
+        self.temperature_status.setText("Temperature readings unavailable")
+        self.temperature_values.setText("")
+        self.gpu_card.update_metric(None, "GPU unavailable")
+        self.vram_card.update_metric(None, "VRAM unavailable")
         self._snapshot = None
         self.cpu_card.update_metric(None, "CPU telemetry unavailable")
         self.ram_card.update_metric(None, "RAM telemetry unavailable")
@@ -540,11 +689,15 @@ class MainWindow(QMainWindow):
             event.ignore()
             if not self._closing:
                 self._closing = True
+                self._render_timer.stop()
+                self._pending_chunks.clear()
                 for job in self._jobs:
-                    job.cancel_event.set()
+                    job.cancel()
                 if monitor_running:
                     self.monitor_stop_requested.emit()
-                self.connection_status.setText("Closing… waiting for background work to finish.")
+                message = "Closing… waiting for background work to finish."
+                self.connection_status.setText(message)
+                self.settings_status.setText(message + " Network reads can take up to 60 seconds.")
                 self._update_controls()
                 self._shutdown_timer.start()
             return

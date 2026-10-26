@@ -16,8 +16,18 @@ from nexus_ai.game_lifecycle import (
 
 
 @pytest.mark.parametrize(
-    "bad", ["", " ", "../game.exe", "C:\\Games\\game.exe", "game", "*.exe",
-            "game.exe --flag", ".exe", "x" * 130 + ".exe"],
+    "bad",
+    [
+        "",
+        " ",
+        "../game.exe",
+        "C:\\Games\\game.exe",
+        "game",
+        "*.exe",
+        "game.exe --flag",
+        ".exe",
+        "x" * 130 + ".exe",
+    ],
 )
 def test_only_executable_filenames_are_allowed(bad):
     with pytest.raises(ValueError):

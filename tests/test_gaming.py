@@ -48,7 +48,11 @@ def test_profile_store_roundtrip_preserves_all_modes_priority_and_unicode(tmp_pa
     assert not list(store.path.parent.glob(".games-*.tmp"))
 
 
-@pytest.mark.parametrize("contents", [b"{", b"[]", b"null", b"\xff", b"x" * (256 * 1024 + 1)])
+@pytest.mark.parametrize(
+    "contents",
+    [b"{", b"[]", b"null", b"\xff", b"x" * (256 * 1024 + 1)],
+    ids=["malformed-json", "json-array", "json-null", "invalid-utf8", "oversized-file"],
+)
 def test_corrupt_or_oversized_profile_file_preserved_and_detection_disabled(tmp_path, contents):
     path = tmp_path / "games.json"
     path.write_bytes(contents)

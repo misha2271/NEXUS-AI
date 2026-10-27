@@ -46,6 +46,7 @@ from nexus_ai.ui.dashboard import (
 )
 from nexus_ai.ui.localization import Translator
 from nexus_ai.ui.theme import STYLE
+from nexus_ai.ui.v1 import V1Features
 from nexus_ai.workers import OllamaJob, TelemetryWorker
 
 
@@ -84,7 +85,7 @@ class MetricCard(QFrame):
             self.bar.setValue(round(percent))
 
 
-class MainWindow(QMainWindow):
+class MainWindow(V1Features, QMainWindow):
     monitor_interval_changed = Signal(int)
     monitor_stop_requested = Signal()
 
@@ -130,6 +131,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(720, 540)
         self.setStyleSheet(STYLE)
         self._build_ui()
+        self._install_v1_panels()
         self.i18n.watch_tree(self)
         self.i18n.language_changed.connect(self._retranslate_view)
         self._retranslate_view()
@@ -137,6 +139,7 @@ class MainWindow(QMainWindow):
         if store.warning:
             self.i18n.bind(self.settings_status, store.warning, "setText")
         if start_background:
+            self._start_v1()
             self._start_monitor(collector_factory)
             QTimer.singleShot(0, self.refresh_models)
 
@@ -308,7 +311,7 @@ class MainWindow(QMainWindow):
         self.i18n.bind(
             self.transcript,
             "A clear space to think.\n\nChoose an installed model, then start a conversation.\n"
-            "History stays in this session; prompts go to your configured Ollama server.",
+            "Completed turns are saved locally; prompts go to your configured Ollama server.",
             "setPlaceholderText",
         )
         self.transcript.document().setMaximumBlockCount(10000)
@@ -441,7 +444,7 @@ class MainWindow(QMainWindow):
     def _policy(self) -> InferencePolicy:
         snapshot = self._snapshot
         return resolve_policy(
-            self.settings.profile,
+            getattr(self, "_effective_profile", self.settings.profile),
             cpu_percent=(snapshot.cpu_percent or 0) if snapshot else 0,
             ram_available_bytes=snapshot.ram_available_bytes if snapshot else None,
         )
@@ -472,6 +475,7 @@ class MainWindow(QMainWindow):
             self.profile_combo.blockSignals(True)
             self.profile_combo.setCurrentIndex(self.profile_combo.findData(self.settings.profile))
             self.profile_combo.blockSignals(False)
+        self.game_center.set_base_mode(self.settings.profile)
         self._apply_policy()
 
     @Slot(int)
@@ -499,7 +503,9 @@ class MainWindow(QMainWindow):
         url = QLineEdit(self.settings.ollama_url)
         url.setObjectName("serverUrl")
         url.setAccessibleName("Ollama server URL")
-        url.setEnabled(not self._jobs)
+        url.setEnabled(
+            not self._jobs and not self.game_center.network_busy and not self.conversations.busy
+        )
         layout.addRow("Server URL", url)
         hint = label("Use an existing Ollama server, such as http://127.0.0.1:11434.")
         layout.addRow(hint)
@@ -524,7 +530,9 @@ class MainWindow(QMainWindow):
         language.currentIndexChanged.connect(switch_language)
 
         def save() -> None:
-            if self._jobs and url.text() != self.settings.ollama_url:
+            if (
+                self._jobs or self.game_center.network_busy or self.conversations.busy
+            ) and url.text() != self.settings.ollama_url:
                 self.i18n.bind(
                     error, "Wait for the current request before changing the server URL."
                 )
@@ -533,6 +541,7 @@ class MainWindow(QMainWindow):
             if self._persist(replace(self.settings, ollama_url=url.text())):
                 dialog.accept()
                 if self.settings.ollama_url != previous_url and not self._jobs:
+                    self.game_center.set_endpoint(self.settings.ollama_url)
                     self._clear_chat()
                     self.refresh_models()
             else:
@@ -547,6 +556,8 @@ class MainWindow(QMainWindow):
 
     def _start_job(self, job: OllamaJob) -> None:
         self._jobs.add(job)
+        self.game_center.set_chat_busy(True)
+        self.conversations.set_chat_busy(True)
         job.signals.result.connect(self._job_result)
         job.signals.failed.connect(self._job_failed)
         job.signals.chunk.connect(self._chat_chunk)
@@ -556,7 +567,12 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def refresh_models(self) -> None:
-        if self._closing or self._chat_job is not None or self._discovery_job is not None:
+        if (
+            self._closing
+            or self._chat_job is not None
+            or self._discovery_job is not None
+            or self.game_center.network_busy
+        ):
             return
         self.i18n.bind(self.connection_status, "Connecting to Ollama…", "setText")
         self.model_combo.blockSignals(True)
@@ -570,8 +586,17 @@ class MainWindow(QMainWindow):
     def send_message(self) -> None:
         prompt = self.prompt.toPlainText().strip()
         model = self.model_combo.currentData()
-        if self._closing or self._chat_job or self._discovery_job or not prompt or not model:
+        if (
+            self._closing
+            or self._chat_job
+            or self._discovery_job
+            or not prompt
+            or not model
+            or self.game_center.network_busy
+            or self.conversations.busy
+        ):
             return
+        self.game_center.request_restore()
         self.navigate("assistant")
         self._persist(replace(self.settings, model=model))
         # Keep context bounded; larger context windows still depend on the selected model.
@@ -664,6 +689,9 @@ class MainWindow(QMainWindow):
                     self.connection_status, "Stopped. Ready for another message.", "setText"
                 )
             elif self._draft_response:
+                if job.model:
+                    self.game_center.note_model_used(job.model)
+                    self.conversations.save_turn(self._pending_user, self._draft_response)
                 self._messages.extend(
                     [
                         {"role": "user", "content": self._pending_user},
@@ -710,6 +738,8 @@ class MainWindow(QMainWindow):
             self._pending_user = ""
         if job is self._discovery_job:
             self._discovery_job = None
+        self.game_center.set_chat_busy(bool(self._jobs))
+        self.conversations.set_chat_busy(bool(self._jobs))
         self._update_controls()
 
     @Slot()
@@ -726,14 +756,14 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _clear_chat(self) -> None:
-        if self._chat_job is None:
-            self._messages.clear()
-            self.transcript.clear()
-            self._transcript_segments.clear()
+        if self._chat_job is None and not self.conversations.busy:
+            self.conversations.new_conversation()
 
     @Slot()
     def _update_controls(self) -> None:
         busy = bool(self._jobs) or self._closing
+        if hasattr(self, "game_center"):
+            busy = busy or self.game_center.network_busy or self.conversations.busy
         self.send_button.setEnabled(
             not busy
             and bool(self.prompt.toPlainText().strip())
@@ -927,7 +957,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         monitor_running = self._monitor_thread is not None and self._monitor_thread.isRunning()
-        if self._jobs or self._pool.activeThreadCount() or monitor_running:
+        if not self._closing:
+            self._stop_v1()
+        if self._jobs or self._pool.activeThreadCount() or monitor_running or self._v1_busy():
             event.ignore()
             if not self._closing:
                 self._closing = True
@@ -955,6 +987,11 @@ class MainWindow(QMainWindow):
     @Slot()
     def _check_shutdown(self) -> None:
         monitor_running = self._monitor_thread is not None and self._monitor_thread.isRunning()
-        if not self._jobs and not self._pool.activeThreadCount() and not monitor_running:
+        if (
+            not self._jobs
+            and not self._pool.activeThreadCount()
+            and not monitor_running
+            and not self._v1_busy()
+        ):
             self._shutdown_timer.stop()
             self.close()

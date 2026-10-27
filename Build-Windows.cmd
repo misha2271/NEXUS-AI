@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-echo NEXUS AI v0.4 - Windows builder (without Git or GitHub)
+echo NEXUS AI v1.0 - Windows builder (without Git or GitHub)
 echo Python will be installed via Windows Package Manager if missing.
 echo Dependencies are downloaded from PyPI.
 echo.

@@ -1,4 +1,4 @@
-# NEXUS AI v0.4 architecture
+# NEXUS AI v1.0 architecture
 
 v0.4 is based on the v0.3 commit in PR #2, `a9aee9b`. Existing settings and four
 inference profiles retain their format and behavior. All v0.3 tests are retained.
@@ -12,6 +12,33 @@ inference profiles retain their format and behavior. All v0.3 tests are retained
 | `workers.py` | Model discovery / streamed chat runnables, telemetry timer and resource cleanup | Dedicated pool / QThread |
 | `ollama.py` | HTTP validation, NDJSON protocol, timeouts and response cleanup | Ollama worker, never on UI thread |
 | `modules.py` | Explicit capabilities, validation status and future provider contracts | Registry data; future SDK probes must use workers |
+
+## v1 service integration
+
+`ui/v1.py` connects services to the existing eight routes; the v0.4 telemetry,
+charts, profiles and instant RU/EN switching remain in place.
+
+| Service | Worker boundary / persistence |
+| --- | --- |
+| Game Center | Serial pool for JSON, exact-name process scans and Ollama lifecycle calls. Game detection is opt-in; a separate effective mode preserves the persisted base mode. Confirmed process identity/liveness can establish known game exit despite unrelated protected processes. |
+| Conversations | Serial task runner, short-lived SQLite transactions and optimistic revisions. Completed turns only, explicit resume/delete, plaintext local data. Writes drain during asynchronous close. |
+| Storage / hardware | Fixed read-only PowerShell queries with timeout, no user command interpolation or elevation. Unsupported fields remain absent. |
+| Gamepad | Fixed System32 XInput DLLs on Windows, four read-only slot snapshots, no device writes. |
+| Updates | Worker HTTPS checks, pinned repository and redirect hosts, explicit download/major consent, byte-count and SHA256 verification; staging never executes or extracts a file. |
+| Remote | Off by default; worker-owned HTTP/TLS server. Token, Host/Origin, replay and request bounds at ingress; allowlisted commands cross a main-thread queue. User-supplied TLS is mandatory on a LAN bind. |
+| Voice | Provider protocols default deny audio; pure Russian/English allowlisted text intent parser. |
+
+A successful chat grants ownership only to its requested model at the current
+endpoint. Discovery does not grant ownership; changing endpoints forgets it.
+Lifecycle operations serialize against NEXUS requests. An explicit next request
+loads on demand and pauses auto-unload for the current game. Ollama residency is
+shared: another client using that same model can still be affected by consented
+unloading. NEXUS never kills Ollama, games or unrelated processes.
+
+Every panel exposes nonblocking shutdown and a busy state. The main window waits
+for these pools and the telemetry/chat workers through its existing shutdown timer;
+no filesystem, process, socket, SQLite operation or thread join runs on the UI thread.
+Native dialogs may wait for user input; they do not perform the worker operations.
 
 ## Sampling and rendering
 
@@ -54,16 +81,16 @@ controls are disabled until every job and the monitor thread have exited.
 resources, and publish `IntegrationStatus` including actual availability,
 capabilities, validation status, and a reason. `IntegrationRegistry` defaults to
 denial: availability alone cannot authorize a control. There are currently **no
-registered hardware providers or command executors**. The UI's RGB, speaker RGB,
-fan, rumble, SMART and update buttons remain disabled regardless of placeholder
-navigation. Recording a status does not wire up or enable any device writes.
+registered hardware providers or command executors**. The UI's RGB, speaker RGB, fan, rumble, firmware and update installation
+buttons remain disabled. Separate read-only diagnostics and consented update
+downloads are connected through the v1 panels. Recording a status does not wire up or enable any device writes.
 
 Before exposing RGB or fan writes, a future implementation needs a supported SDK,
 physical-device testing, supported-model discovery, cancellation/cleanup tests,
 capability checks at the command boundary, safe ranges, and visible error reporting.
-No guessed HID commands, OS tuning, firmware installation, downloads, or simulated
-health percentages are part of this version. Update Center displays the installed
-version only; it does not check for or install updates.
+No guessed HID commands, OS tuning, firmware installation or simulated health
+percentages are part of this version. Update Center can check and verify a
+consented download; it never installs updates.
 
 ## Validation boundaries
 

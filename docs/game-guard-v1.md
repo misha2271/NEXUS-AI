@@ -1,21 +1,35 @@
-# NEXUS AI v1.0 — Game Guard foundation
+# NEXUS AI v1.0 — Game Guard
 
-This is the first **backend-only** v1.0 increment. It is not yet connected to
-the Windows interface or background polling. It must not be advertised as an
-automatic game optimizer in a released build.
+The original PR #4 backend API in `game_lifecycle.py` is preserved with its tests.
+The desktop now uses the richer persistent `gaming.py` / `lifecycle.py` services
+through `ui/game_center.py`. See [the bilingual implementation and safety
+contract](gaming.md) for details.
 
-- Match running processes by **explicitly configured executable filenames**.
-- Handle missing or inaccessible process information without crashing.
-- Detect transitions into and out of a gaming session, including several games.
-- Recommend an Ollama unload only after opt-in and only for a model that NEXUS
-  previously used. No process termination, power-plan changes, fan control,
-  arbitrary model unloading or automatic model preload.
-- Ollama is a shared service. Even a model previously used by NEXUS might be
-  used by another app: an actual unload requires informed opt-in and must not
-  be triggered while NEXUS has an active chat request.
-- Game exit restores **availability of AI on demand**, not an automatic preload.
+The existing Gaming page supports adding, editing and removing configured games.
+Detection and per-game model unloading require explicit opt-in. Real process names
+are scanned in a background worker. Confirmed games select Gaming mode; after the
+known session ends, the selected base performance mode returns. Users can change
+that base mode during gaming without changing the currently effective game policy.
 
-The Ollama REST API supports unloading with
-`POST /api/generate` and `{"model": "...", "prompt": "", "keep_alive": 0}`.
-Future UI integration must execute it off the UI thread, ask permission,
-use timeouts and preserve Russian/English localization.
+Only a model successfully used by NEXUS is eligible for automatic unloading.
+Ollama's supported API runs outside the UI thread and never kills processes,
+deletes models or adopts unrelated loaded models. Ollama residency is server-wide:
+other clients using the same model may be affected, as explained in the UI.
+Models load again only on explicit chat or restoration requests.
+
+## Русский
+
+Исходный API из PR #4 и его тесты сохранены. На странице «Игры» теперь работают
+добавление, изменение и удаление настроенных игр. Обнаружение процессов и выгрузка
+моделей включаются явно. Запуск подтверждённой игры включает игровой режим;
+после завершения известного сеанса возвращается выбранный пользователем профиль.
+
+Выгружается только модель, которой успешно пользовалась NEXUS. Сеть, чтение
+процессов и файлов выполняются в рабочих потоках. Процессы не завершаются,
+модели не удаляются. Память одной модели Ollama общая для клиентов сервера,
+поэтому согласие на выгрузку предупреждает о влиянии на другие приложения.
+Загрузка модели происходит по явному запросу чата или восстановления.
+
+Tests use local fixtures for process and API behavior. Real game sessions and
+GPU-memory recovery on a physical Windows/Ollama installation remain manual
+acceptance requirements; simulated tests do not establish hardware validation.

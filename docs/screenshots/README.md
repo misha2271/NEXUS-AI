@@ -1,4 +1,4 @@
-# Actual v0.4 screenshots
+# Actual v1.0 screenshots
 
 These PNGs were captured from the running PySide6 application on the Linux cloud
 host using the offscreen Qt platform. CPU/RAM and chart samples came from the real
@@ -10,6 +10,8 @@ sensors or Ollama server, and the UI shows those limitations explicitly.
 - [Russian assistant, 1280 × 860](assistant.png): actual offline endpoint, disabled send.
 - [RGB Studio, 1280 × 860](rgb-unavailable.png): no provider and disabled controls.
 - [Compact dashboard, 780 × 900](compact.png): reflowed cards and single-column charts.
+- [Game Center](game-center.png): real controls, empty game configuration, detection and unloading off.
+- [SSD Health](ssd-health.png), [Gamepad Lab](gamepad-lab.png), [Update Center](update-center.png): on-demand controls; checks have not been run in these captures.
 
 Russian is the default language in these captures. The English comparison uses
 its own temporary preferences and real host samples, not edited image text.

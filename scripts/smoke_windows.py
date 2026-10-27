@@ -76,12 +76,15 @@ def validate_report(report: Mapping[str, Any], appdata: Path, *, second_run: boo
         "ui_constructed": True,
         "settings_roundtrip": True,
         "nvml_binding_available": True,
+        "language_persistence": True,
     }
     for key, expected in required.items():
         if type(report.get(key)) is not type(expected) or report.get(key) != expected:
             raise RuntimeError(f"Frozen application self-test failed: {key} must be {expected!r}.")
     if report.get("errors") != []:
         raise RuntimeError("Frozen application self-test reported errors.")
+    if report.get("languages_tested") != ["ru", "en"]:
+        raise RuntimeError("Frozen application self-test must exercise Russian and English.")
     for field in ("settings_path", "persistence_probe_path"):
         if not _under_directory(report.get(field), appdata):
             raise RuntimeError(

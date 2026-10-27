@@ -54,6 +54,10 @@ def pyinstaller_command(root: Path, mode: str) -> list[str]:
         "PySide6.QtWidgets",
         "psutil._psutil_windows",
         "pynvml",  # Loaded with importlib by the optional hardware backend.
+        "sqlite3",
+        "ssl",
+        "http.server",
+        "ctypes",
     ):
         command.extend(("--hidden-import", module))
     command.extend(("--collect-data", "certifi"))

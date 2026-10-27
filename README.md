@@ -37,7 +37,7 @@ localized v0.4 branch. No release or automatic installation is performed.
 
 All process, storage, device, database and network operations run outside Qt's UI
 thread. Shutdown waits asynchronously for bounded work; it never kills unrelated
-processes. See [security checks](docs/security.md) and [validation](docs/v1-validation.md).
+processes. See [security checks](docs/security.md) and [validation](docs/v1-validation.md) and [release checklist](docs/release-checklist-v1.md).
 Real Windows sensor availability and physical device behavior remain unverified
 until tested on the target computer. CI smoke tests validate packaging and UI,
 not possession of any particular hardware.

@@ -37,7 +37,9 @@ unloading. NEXUS never kills Ollama, games or unrelated processes.
 
 Every panel exposes nonblocking shutdown and a busy state. The main window waits
 for these pools and the telemetry/chat workers through its existing shutdown timer;
-no filesystem, process, socket, SQLite operation or thread join runs on the UI thread.
+service filesystem, process, socket and SQLite work stays off the UI thread.
+Small preference writes retain the existing atomic SettingsStore path; no thread
+join runs on the UI thread.
 Native dialogs may wait for user input; they do not perform the worker operations.
 
 ## Sampling and rendering

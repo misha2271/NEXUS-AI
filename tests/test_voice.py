@@ -137,7 +137,11 @@ def test_cancel_before_and_after_provider_operation_does_not_return_fake_text():
         voice.transcribe(b"audio", cancel_event=event)
 
 
-@pytest.mark.parametrize("audio", [b"", "not audio bytes", b"a" * (10 * 1024 * 1024 + 1)])
+@pytest.mark.parametrize(
+    "audio",
+    [b"", "not audio bytes", b"a" * (10 * 1024 * 1024 + 1)],
+    ids=["empty", "wrong-type", "over-10-mib"],
+)
 def test_audio_input_limits_are_enforced_before_calling_provider(audio):
     provider = ExplicitTestProvider()
     with pytest.raises(VoiceError, match="size limit"):

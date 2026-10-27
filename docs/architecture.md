@@ -106,7 +106,8 @@ These checks do not validate real Ollama inference, an installed NVIDIA driver,
 physical GPU temperature accuracy, RGB devices, Windows 11 desktop interactions,
 the winget bootstrap, code signing, or installation on a clean user's PC. Those
 remain manual acceptance requirements. Actions uploads tested build artifacts;
-it does not create releases, tags, installers or automatic merges.
+it also validates a per-user Inno Setup installer, but creates no releases, tags
+or automatic merges.
 
 ## Localization
 

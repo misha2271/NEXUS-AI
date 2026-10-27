@@ -30,7 +30,7 @@ localized v0.4 branch. No release or automatic installation is performed.
 | AI conversations | Completed turns stored locally in SQLite; explicitly resume, start or delete conversations. Cancelled and failed replies are excluded. Prompts and replies are plaintext local data; do not enter secrets. |
 | SSD diagnostics | Read-only Windows `Get-PhysicalDisk` / `Get-StorageReliabilityCounter`; display only counters exposed by the actual driver. Missing SMART fields remain unavailable. Wear is consumed wear, not remaining health. |
 | Gamepad Lab | Read-only standard Windows XInput slots, button and stick snapshots. No Elite identity, paddles, rumble, calibration or firmware support is claimed. |
-| Updates | Check the official repository's stable GitHub Releases on request. Explicitly approve downloads; SHA-256 digest and byte count are required; major-version downloads require an additional confirmation. No installer or code-signature claim. |
+| Updates | Check the official repository's stable GitHub Releases on request. Explicitly approve downloads; SHA-256 digest and byte count are required; major-version downloads require an additional confirmation. No automatic update installation or code-signature claim. |
 | Russian voice foundation | Validated-provider STT/TTS contracts and an actual allowlisted Russian/English **text** command router. No bundled microphone capture, wake word, audio recognition or synthesis. |
 | iPhone remote foundation | Disabled by default. Token-authenticated web interface, bounded requests, replay protection and approved status/stop/profile commands. Loopback HTTP for local testing; LAN binds require a user-supplied trusted TLS certificate. No physical iPhone validation yet. |
 | MSI / G560 / cooling | Read-only Windows device inventory and documented official interfaces. Candidate names do not establish SDK support. RGB, fan and audio writes remain disabled. |
@@ -124,7 +124,8 @@ page, download either of these artifacts:
 Neither distribution needs a separate Python installation. Both still require
 Ollama and a downloaded model for inference, and NVIDIA drivers for optional GPU
 telemetry. They do not include Ollama, models, or NVIDIA driver DLLs. The build
-configuration does not sign executables or create an installer.
+configuration does not sign executables. A separate native Inno Setup stage builds
+and validates the per-user installer.
 
 Settings remain in `%APPDATA%\NEXUS AI\settings.json` across restarts and updates.
 They are never written beside the EXE or into PyInstaller's temporary extraction
@@ -395,7 +396,7 @@ pyproject.toml
 - **Standalone build fails to launch:** keep the complete onedir folder together,
   inspect the smoke reports, and confirm the binary was built for x64 Windows.
   Onefile execution requires a writable temporary directory. The workflow does
-  not sign binaries or produce an installer.
+  not sign binaries; the per-user installer has a separate installation smoke test.
 - Settings contain preferences only; conversations use a separate local database.
   Audio recognition/synthesis, authenticated remote Ollama credentials, model training,
   and OS tuning remain unsupported. The separate remote-control foundation does not

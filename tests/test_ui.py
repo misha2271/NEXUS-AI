@@ -108,10 +108,7 @@ def make_window(qtbot, tmp_path):
                 or (
                     not window._jobs
                     and not window._pool.activeThreadCount()
-                    and (
-                        window._monitor_thread is None
-                        or not window._monitor_thread.isRunning()
-                    )
+                    and (window._monitor_thread is None or not window._monitor_thread.isRunning())
                     and not window.isVisible()
                 )
             ),

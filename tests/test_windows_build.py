@@ -274,6 +274,7 @@ def native_build_fixture(build, monkeypatch, tmp_path):
     monkeypatch.setattr(build, "_check_dependencies", lambda: None)
     (tmp_path / "pyproject.toml").write_text('[project]\nversion="0.3.0"\n', encoding="utf-8")
     (tmp_path / "README.md").write_text("Windows instructions", encoding="utf-8")
+    (tmp_path / "README.ru.md").write_text("Инструкция Windows", encoding="utf-8")
 
 
 def emit_pyinstaller_fixture(command, **_kwargs):
@@ -342,6 +343,7 @@ def test_both_builds_must_pass_smoke_before_portable_zip_and_checksums(
     assert "  NEXUS-AI-Portable.zip\n" in checksums
     with zipfile.ZipFile(artifacts[1]) as archive:
         assert "NEXUS-AI/README.md" in archive.namelist()
+        assert archive.read("NEXUS-AI/README.ru.md").decode("utf-8") == "Инструкция Windows"
 
 
 def test_missing_build_dependencies_remove_stale_canonical_outputs(scripts, monkeypatch, tmp_path):

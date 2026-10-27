@@ -47,6 +47,24 @@ jobs:
         run: python scripts/run_tests.py
       - name: Build and smoke-test both Windows executables
         run: python scripts/build_windows.py --mode both
+      - name: Locate or install the verified Inno Setup compiler
+        run: |
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 7\ISCC.exe"
+          )
+          $compiler = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $compiler) {
+            choco install innosetup --yes --no-progress --limit-output --require-checksums --source=https://community.chocolatey.org/api/v2/
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $compiler = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          }
+          if (-not $compiler) { throw "Inno Setup ISCC.exe was not found after installation." }
+          "ISCC_PATH=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Build and test the per-user Windows installer
+        run: python scripts/build_installer.py --iscc "$env:ISCC_PATH"
       - name: Archive complete source
         if: always()
         run: |
@@ -73,6 +91,14 @@ jobs:
         with:
           name: NEXUS-AI-1.0.0-windows-x64-checksums
           path: dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload tested per-user installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-AI-1.0.0-windows-x64-installer
+          path: dist/NEXUS-AI-Setup-1.0.0.exe
+          compression-level: 0
           if-no-files-found: error
           retention-days: 14
       - name: Upload complete source archive

@@ -3,7 +3,7 @@
 Validated in the existing Linux cloud workspace on 2026-10-27, preserving the
 v0.4 branch and PR #4 history. No branch merge, tag or release was created.
 
-- Python 3.12: **565 pytest tests passed** in 8.81 s, including preserved v0.4
+- Python 3.12: **574 pytest tests passed** in 10.49 s, including preserved v0.4
   tests, Game Guard state/HTTP tests, GUI integration, persistent conversation
   relaunch, cancellation, asynchronous close, Russian/English and remote security.
 - `ruff check .`, `ruff format --check .`, `compileall` and `git diff --check`: pass.
@@ -33,7 +33,7 @@ Real device behavior, game timing, VRAM release and trusted iPhone LAN TLS still
 require tests on the user's equipment. No audio backend, Elite-specific feature,
 RGB/fan write, update installer or code signing is claimed.
 
-Все 565 локальных теста прошли; проверки оборудования физически не проводились.
+Все 574 локальных теста прошли; проверки оборудования физически не проводились.
 Успешная сборка EXE подтверждает упаковку и запуск интерфейса, но не наличие
 подключённого оборудования. Для живой проверки нужны компьютер Windows и
 реальные устройства. Публикация релиза и слияние веток не выполняются.

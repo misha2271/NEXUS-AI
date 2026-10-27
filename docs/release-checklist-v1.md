@@ -21,7 +21,9 @@ This checklist authorizes no merge, tag, release, installer or hardware writes.
 - [ ] Native Windows onefile EXE and complete Portable ZIP built at final SHA.
 - [ ] Both EXEs launch twice without Python on PATH; RU/EN, persistent settings,
       CPU/RAM and clean shutdown smoke probes pass.
-- [ ] SHA256SUMS matches downloaded files; source and smoke reports downloadable.
+- [ ] Per-user `NEXUS-AI-Setup-1.0.0.exe`: silent install, installed EXE RU/EN smoke
+      without Python, silent uninstall, preserved user preferences/conversations.
+- [ ] SHA256SUMS matches all three downloads; source and smoke reports downloadable.
 - [ ] PR validation report records exact counts, SHA, run and artifact URLs.
 
 ## Manual Windows 11 acceptance / Проверка на Windows 11

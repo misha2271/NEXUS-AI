@@ -400,3 +400,18 @@ pyproject.toml
   Audio recognition/synthesis, authenticated remote Ollama credentials, model training,
   and OS tuning remain unsupported. The separate remote-control foundation does not
   add authentication to your configured Ollama server.
+
+
+## Windows installer (development builds)
+
+The native workflow also prepares **NEXUS-AI-Setup-1.0.0.exe** from the validated
+portable directory. Download the installer artifact only from a successful run.
+Setup installs per user without administrator privileges and offers Russian and
+English. It includes the Python/Qt runtime, not Ollama or a language model.
+The pipeline must silently install it, run the installed executable twice with
+Python removed from PATH, then uninstall it before uploading the installer and
+its SHA256. User settings and conversations are preserved by uninstall.
+
+Builds are unsigned: Windows SmartScreen behavior requires manual acceptance
+testing. No release is published by the build workflow. See the
+[release checklist](docs/release-checklist-v1.md).

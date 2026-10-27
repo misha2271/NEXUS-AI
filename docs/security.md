@@ -5,7 +5,7 @@
 Run from an activated project virtual environment:
 
 ```console
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip "setuptools>=84.1.0"
 python -m pip install -e ".[dev,nvidia,security]"
 python -m bandit -r src -ll -ii
 python -m pip_audit --progress-spinner off
@@ -17,6 +17,8 @@ with at least medium confidence. It separately audits the actual installed runti
 and security-tool dependencies against PyPI's advisory database. No vulnerability
 IDs are ignored. Tooling must also be current: an outdated development `pip` can
 cause a dependency audit failure even though it is not bundled in the EXE.
+CI also upgrades the runner's preinstalled setuptools before auditing it, rather
+than excluding build-tool advisories from the audit.
 The local unpublished `nexus-ai-desktop` project cannot be looked up on PyPI;
 its source is scanned directly. Advisory checks require network access and do not
 establish that every dependency or hardware interface is safe.

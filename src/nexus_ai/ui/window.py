@@ -593,7 +593,7 @@ class MainWindow(V1Features, QMainWindow):
             or not prompt
             or not model
             or self.game_center.network_busy
-            or self.conversations.busy
+            or self.conversations.context_busy
         ):
             return
         self.game_center.request_restore()
@@ -756,14 +756,14 @@ class MainWindow(V1Features, QMainWindow):
 
     @Slot()
     def _clear_chat(self) -> None:
-        if self._chat_job is None and not self.conversations.busy:
+        if self._chat_job is None and not self.conversations.context_busy:
             self.conversations.new_conversation()
 
     @Slot()
     def _update_controls(self) -> None:
         busy = bool(self._jobs) or self._closing
         if hasattr(self, "game_center"):
-            busy = busy or self.game_center.network_busy or self.conversations.busy
+            busy = busy or self.game_center.network_busy or self.conversations.context_busy
         self.send_button.setEnabled(
             not busy
             and bool(self.prompt.toPlainText().strip())

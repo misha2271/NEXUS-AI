@@ -54,11 +54,11 @@ class TaskRunner(QObject):
     def pending(self):
         return bool(self._tasks)
 
-    def submit(self, operation, done=None):
+    def submit(self, operation, done=None, *, finished=None):
         if self._closing:
             return False
         task = _Task(operation)
-        self._tasks[task] = done
+        self._tasks[task] = (done, finished)
         task.signals.result.connect(self._result)
         task.signals.failed.connect(self._failed)
         task.signals.finished.connect(self._finished)
@@ -68,7 +68,7 @@ class TaskRunner(QObject):
 
     @Slot(object, object)
     def _result(self, task, result):
-        callback = self._tasks.get(task)
+        callback, _finished = self._tasks.get(task, (None, None))
         if callback is not None:
             callback(result)
 
@@ -78,7 +78,9 @@ class TaskRunner(QObject):
 
     @Slot(object)
     def _finished(self, task):
-        self._tasks.pop(task, None)
+        _done, callback = self._tasks.pop(task, (None, None))
+        if callback is not None:
+            callback()
         self.busy_changed.emit(bool(self._tasks))
 
     def shutdown(self):

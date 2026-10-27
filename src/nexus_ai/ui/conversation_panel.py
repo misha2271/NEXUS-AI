@@ -40,6 +40,7 @@ class ConversationPanel(QWidget):
         self._identifier = None
         self._summaries = ()
         self._chat_busy = False
+        self._context_pending = 0
         self._closing = False
         layout = QVBoxLayout(self)
         self.selector = QComboBox()
@@ -80,6 +81,24 @@ class ConversationPanel(QWidget):
     @property
     def busy(self):
         return self.runner.busy
+
+    @property
+    def context_busy(self):
+        """Only operations that replace/remove context must pause new generation.
+
+        Completed-turn saves and list refreshes remain serialized in the worker,
+        but the user may send a follow-up while they finish.
+        """
+        return self._context_pending > 0
+
+    def _submit_context(self, operation, done):
+        self._context_pending += 1
+
+        def finished():
+            self._context_pending -= 1
+
+        if not self.runner.submit(operation, done, finished=finished):
+            self._context_pending -= 1
 
     def _error(self, message):
         self.i18n.bind(self.status, message)
@@ -177,7 +196,7 @@ class ConversationPanel(QWidget):
             self.loaded.emit(tuple(dict(message) for message in self._messages))
             self.i18n.bind(self.status, Text("Conversation restored from local storage."))
 
-        self.runner.submit(load, loaded)
+        self._submit_context(load, loaded)
 
     def delete_selected(self, checked=False, *, confirm=True):
         identifier = self.selector.currentData()
@@ -210,7 +229,7 @@ class ConversationPanel(QWidget):
                 del self._records[session]
             return self.store.list_conversations()
 
-        self.runner.submit(remove, deleted)
+        self._submit_context(remove, deleted)
 
     def shutdown(self):
         self._closing = True

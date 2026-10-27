@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Windows x64 / onefile and onedir
@@ -40,7 +44,7 @@ jobs:
       - name: Run tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m pytest -q
+        run: python -m pytest -vv -o faulthandler_timeout=60
       - name: Build and smoke-test both Windows executables
         run: python scripts/build_windows.py --mode both
       - name: Archive complete source

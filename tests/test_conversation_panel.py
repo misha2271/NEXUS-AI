@@ -119,3 +119,45 @@ def test_conversation_actions_reflow_in_compact_russian_layout(qtbot, tmp_path):
     for button in widget.actions.widgets:
         assert button.geometry().right() <= widget.actions.width()
     widget.shutdown()
+
+
+def test_pending_save_does_not_block_follow_up_context(qtbot, tmp_path, monkeypatch):
+    widget = panel(qtbot, tmp_path)
+    entered = threading.Event()
+    release = threading.Event()
+    original = widget.store.save
+
+    def save(*args, **kwargs):
+        entered.set()
+        if not release.wait(3):
+            raise RuntimeError("Test did not release save worker")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(widget.store, "save", save)
+    try:
+        widget.save_turn("First", "One")
+        qtbot.waitUntil(entered.is_set)
+        assert widget.busy and not widget.context_busy
+        widget.save_turn("Second", "Two")
+    finally:
+        release.set()
+    wait(qtbot, widget)
+    assert len(widget.store.load(widget._identifier).messages) == 4
+    widget.shutdown()
+
+
+def test_failed_resume_clears_context_busy(qtbot, tmp_path, monkeypatch):
+    widget = panel(qtbot, tmp_path)
+    widget.save_turn("First", "One")
+    wait(qtbot, widget)
+
+    def fail(*_):
+        raise RuntimeError("Read failed")
+
+    monkeypatch.setattr(widget.store, "load", fail)
+    widget.load_selected()
+    assert widget.context_busy
+    wait(qtbot, widget)
+    assert not widget.context_busy
+    assert "Read failed" in widget.status.text()
+    widget.shutdown()

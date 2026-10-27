@@ -44,7 +44,7 @@ jobs:
       - name: Run tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m pytest -vv -o faulthandler_timeout=60
+        run: python scripts/run_tests.py
       - name: Build and smoke-test both Windows executables
         run: python scripts/build_windows.py --mode both
       - name: Archive complete source

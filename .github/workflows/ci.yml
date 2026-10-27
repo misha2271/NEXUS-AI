@@ -48,7 +48,7 @@ jobs:
       - name: Check formatting
         run: python -m ruff format --check .
       - name: Test
-        run: python -m pytest -vv -o faulthandler_timeout=60
+        run: python scripts/run_tests.py
       - name: Compile modules
         run: python -m compileall -q src
       - name: Build wheel and source distribution

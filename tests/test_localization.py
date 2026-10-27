@@ -51,9 +51,10 @@ def windows(qtbot, tmp_path):
             continue
         window.close()
         qtbot.waitUntil(
-            lambda window=window: not isValid(window)
-            or (not window.isVisible() and not window._jobs),
-            timeout=6000
+            lambda window=window: (
+                not isValid(window) or (not window.isVisible() and not window._jobs)
+            ),
+            timeout=6000,
         )
 
 

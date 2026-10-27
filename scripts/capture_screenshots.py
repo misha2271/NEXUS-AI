@@ -41,6 +41,10 @@ def main() -> int:
                     ("overview.png", "overview", (1440, 1150)),
                     ("assistant.png", "assistant", (1280, 860)),
                     ("rgb-unavailable.png", "rgb", (1280, 860)),
+                    ("game-center.png", "gaming", (1280, 1000)),
+                    ("ssd-health.png", "ssd", (1280, 1000)),
+                    ("gamepad-lab.png", "gamepad", (1280, 1000)),
+                    ("update-center.png", "updates", (1440, 1000)),
                     ("compact.png", "overview", (780, 900)),
                 ):
                     window.navigate(route)
@@ -75,7 +79,7 @@ def main() -> int:
 
         QTimer.singleShot(12000, capture)
         app.exec()
-    if failures or len(captured) != 5:
+    if failures or len(captured) != 9:
         raise RuntimeError("Screenshot capture incomplete: " + "; ".join(failures))
     print("Saved:", ", ".join(captured))
     return 0

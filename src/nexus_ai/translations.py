@@ -473,3 +473,695 @@ RU.update(
         "Scroll right": "Прокрутить вправо",
     }
 )
+
+# v1 services: storage and protocol errors are translated at the UI boundary.
+RU.update(
+    {
+        "A conversation message exceeds the configured text limit.": (
+            "Сообщение превышает допустимый объём текста."
+        ),
+        "Choose a valid conversation identifier.": "Укажите допустимый идентификатор беседы.",
+        "Choose a valid conversation list limit.": "Укажите допустимое ограничение числа бесед.",
+        "Choose a valid conversation revision.": "Укажите допустимую версию беседы.",
+        "Conversation messages must be a list of chat messages.": (
+            "Сообщения беседы должны быть списком сообщений чата."
+        ),
+        "Conversation messages must contain user or assistant text.": (
+            "Сообщения беседы должны содержать текст пользователя или ассистента."
+        ),
+        "Conversation messages must contain valid Unicode text.": (
+            "Сообщения беседы должны содержать корректный текст Unicode."
+        ),
+        "Conversation messages need only role and content fields.": (
+            "В сообщениях беседы допускаются только поля роли и текста."
+        ),
+        "Conversation storage exceeds the configured size limit.": (
+            "Хранилище бесед превышает допустимый размер."
+        ),
+        "Conversation storage failed; existing data was preserved: {error}": (
+            "Ошибка хранилища бесед; существующие данные сохранены: {error}"
+        ),
+        "Conversation storage has an unsupported schema; the file was preserved.": (
+            "Формат хранилища бесед не поддерживается; файл сохранён."
+        ),
+        "Conversation storage is full; delete an old chat first.": (
+            "Хранилище бесед заполнено; сначала удалите старую беседу."
+        ),
+        "Conversation storage must not be a symbolic link.": (
+            "Хранилище бесед не должно быть символической ссылкой."
+        ),
+        "Conversation titles must be text of at most 200 characters.": (
+            "Название беседы должно содержать не более 200 символов."
+        ),
+        "Conversation titles must contain valid Unicode text.": (
+            "Название беседы должно содержать корректный текст Unicode."
+        ),
+        "Stored conversation data is invalid; the file was preserved.": (
+            "Сохранённые данные беседы некорректны; файл сохранён."
+        ),
+        "This conversation changed in another operation; reload it before saving.": (
+            "Беседа изменена другой операцией; загрузите её заново перед сохранением."
+        ),
+        "This conversation exceeds the configured message limit.": (
+            "Беседа превышает допустимое число сообщений."
+        ),
+        "This conversation exceeds the configured text limit.": (
+            "Беседа превышает допустимый объём текста."
+        ),
+        "This conversation no longer exists.": "Эта беседа больше не существует.",
+        "Add executable names to enable game detection.": (
+            "Добавьте имена исполняемых файлов для обнаружения игр."
+        ),
+        "At most 100 game profiles are supported.": "Поддерживается не более 100 игровых профилей.",
+        "Automatic game detection is disabled.": "Автоматическое обнаружение игр отключено.",
+        "Game detected: {game}": "Обнаружена игра: {game}",
+        "Game detection configuration is invalid.": "Настройки обнаружения игр некорректны.",
+        "Game profile configuration is too large.": "Настройки игровых профилей слишком велики.",
+        "Game profile is invalid.": "Игровой профиль некорректен.",
+        "Game profile mode or unload preference is invalid.": (
+            "Режим игрового профиля или настройка выгрузки некорректны."
+        ),
+        "Game profile names must be unique.": "Названия игровых профилей должны быть уникальными.",
+        "Game profile needs a valid name.": "Укажите допустимое название игрового профиля.",
+        "Game profile priority must be between -100 and 100.": (
+            "Приоритет игрового профиля должен быть от −100 до 100."
+        ),
+        ("Game profiles could not be read. Detection is disabled; the file was preserved."): (
+            "Не удалось прочитать игровые профили. Обнаружение отключено; файл сохранён."
+        ),
+        "No configured game process is running.": "Ни одна из настроенных игр не запущена.",
+        "Process detection is incomplete; some process names are inaccessible.": (
+            "Обнаружение процессов неполное: некоторые имена процессов недоступны."
+        ),
+        "Specify between 1 and 32 executable names per game profile.": (
+            "Укажите от 1 до 32 имён исполняемых файлов для игрового профиля."
+        ),
+        "Use exact executable basenames, not paths or wildcards.": (
+            "Укажите точные имена исполняемых файлов без путей и подстановочных знаков."
+        ),
+        (
+            "A G560 name match does not validate Logitech LED SDK support. Speaker RGB, "
+            "audio and firmware controls remain disabled."
+        ): (
+            "Совпадение имени G560 не подтверждает поддержку Logitech LED SDK. Управление"
+            " подсветкой, звуком и прошивкой колонок остаётся отключённым."
+        ),
+        "Cooling": "Охлаждение",
+        "Inconsistent Windows fan inventory state.": (
+            "Состояние списка вентиляторов Windows противоречиво."
+        ),
+        "Invalid Windows baseboard entry.": "Некорректная запись о системной плате Windows.",
+        "Invalid Windows device entry.": "Некорректная запись об устройстве Windows.",
+        "Invalid Windows device hardware identifiers.": (
+            "Некорректные аппаратные идентификаторы устройства Windows."
+        ),
+        "Invalid Windows fan entry.": "Некорректная запись о вентиляторе Windows.",
+        "Invalid Windows fan inventory state.": (
+            "Некорректное состояние списка вентиляторов Windows."
+        ),
+        "Invalid Windows hardware list: {field}.": (
+            "Некорректный список оборудования Windows: {field}."
+        ),
+        (
+            "MSI board identity is detection evidence only. Mystic Light compatibility "
+            "and the vendor SDK are not validated; RGB writes remain disabled."
+        ): (
+            "Обнаружение платы MSI подтверждает только её наличие. Совместимость Mystic "
+            "Light и SDK производителя не проверена; управление RGB остаётся отключённым."
+        ),
+        (
+            "Read-only Windows inventory collected. Candidate matches do not enable "
+            "hardware controls."
+        ): (
+            "Сведения об оборудовании Windows получены без изменения устройств. "
+            "Совпадения имён не включают управление оборудованием."
+        ),
+        "Unsupported Windows diagnostic response.": "Неподдерживаемый ответ диагностики Windows.",
+        (
+            "Win32_Fan inventory does not prove actual RPM, temperature or writable "
+            "control. Cooling controls remain disabled without a supported, physically "
+            "validated provider."
+        ): (
+            "Список Win32_Fan не подтверждает доступ к оборотам, температуре или "
+            "управлению. Управление охлаждением отключено до проверки поддерживаемого "
+            "поставщика на реальном оборудовании."
+        ),
+        "Windows hardware inventory is unavailable on this platform.": (
+            "Сведения об оборудовании Windows недоступны на этой платформе."
+        ),
+        (
+            "Windows hardware query unavailable. No SDK was loaded and no device commands"
+            " were sent."
+        ): (
+            "Запрос оборудования Windows недоступен. SDK не загружался, команды "
+            "устройствам не отправлялись."
+        ),
+        (
+            "Xbox-family PnP names do not prove Elite Series 2 identity or paddle "
+            "support. GameInput/XInput integration and rumble remain unvalidated and "
+            "disabled."
+        ): (
+            "Имена PnP семейства Xbox не подтверждают модель Elite Series 2 или поддержку"
+            " лепестков. Интеграция GameInput/XInput и вибрация не проверены и отключены."
+        ),
+        "Game detection is incomplete; keeping the current game mode.": (
+            "Обнаружение игр неполное; текущий игровой режим сохранён."
+        ),
+        "Game mode: {game}. Models restore only when requested.": (
+            "Игровой режим: {game}. Модели загружаются только по запросу."
+        ),
+        ("Model restoration was requested; automatic unloading is paused for this game."): (
+            "Запрошена загрузка модели; автоматическая выгрузка приостановлена для этой игры."
+        ),
+        (
+            "Model unloading failed; automatic retry is paused until a new request or "
+            "game transition."
+        ): (
+            "Не удалось выгрузить модель; автоматический повтор приостановлен до нового "
+            "запроса или смены состояния игры."
+        ),
+        "Model unloading is deferred until the active request finishes.": (
+            "Выгрузка модели отложена до завершения текущего запроса."
+        ),
+        "Using the selected mode. Models restore only when requested.": (
+            "Используется выбранный режим. Модели загружаются только по запросу."
+        ),
+        "Model retention must be positive and at most 24 hours.": (
+            "Время удержания модели должно быть положительным и не превышать 24 часов."
+        ),
+        "Ollama did not acknowledge the requested model lifecycle operation.": (
+            "Ollama не подтвердила запрошенную операцию с моделью."
+        ),
+        "Ollama returned an invalid running-model entry.": (
+            "Ollama вернула некорректные сведения о загруженной модели."
+        ),
+        "Ollama returned an invalid running-model list.": (
+            "Ollama вернула некорректный список загруженных моделей."
+        ),
+        "Select a valid installed model for lifecycle operations.": (
+            "Выберите допустимую установленную модель для операций загрузки и выгрузки."
+        ),
+        "A bounded request length is required.": "Необходимо указать ограниченную длину запроса.",
+        "A configured TLS certificate or key file is missing.": (
+            "Указанный файл сертификата TLS или ключа не найден."
+        ),
+        "A remote-control allowed hostname is invalid.": (
+            "Разрешённое имя узла удалённого управления некорректно."
+        ),
+        "Bind remote control to a specific local IP address.": (
+            "Укажите конкретный локальный IP-адрес для удалённого управления."
+        ),
+        "Cross-origin remote requests are not allowed.": (
+            "Удалённые запросы с другого источника запрещены."
+        ),
+        "LAN remote control requires a trusted TLS certificate and private key.": (
+            "Для удалённого управления по локальной сети необходимы доверенный сертификат"
+            " TLS и закрытый ключ."
+        ),
+        "Remote authentication failed.": "Ошибка проверки подлинности удалённого подключения.",
+        "Remote command processing is stopped.": "Обработка удалённых команд остановлена.",
+        "Remote commands require JSON.": "Для удалённых команд требуется JSON.",
+        "Remote control is already running.": "Удалённое управление уже запущено.",
+        "Remote control is disabled. Enable it explicitly to start.": (
+            "Удалённое управление отключено. Включите его явно для запуска."
+        ),
+        "Remote control must be explicitly enabled.": (
+            "Удалённое управление необходимо включить явно."
+        ),
+        "Remote control requires a token containing at least 32 random bytes.": (
+            "Для удалённого управления требуется токен не менее чем из 32 случайных байтов."
+        ),
+        "Supply both the TLS certificate and its private key.": (
+            "Укажите сертификат TLS и его закрытый ключ."
+        ),
+        "The TLS certificate and key could not be loaded.": (
+            "Не удалось загрузить сертификат TLS и ключ."
+        ),
+        "The remote command could not be completed.": "Не удалось выполнить удалённую команду.",
+        "The remote command queue is full.": "Очередь удалённых команд заполнена.",
+        "The remote command timed out. Check status before retrying.": (
+            "Время ожидания удалённой команды истекло. Проверьте состояние перед повтором."
+        ),
+        "The remote connection or rate limit is invalid.": (
+            "Ограничение подключений или частоты удалённых запросов некорректно."
+        ),
+        "The remote endpoint was not found.": "Адрес удалённого API не найден.",
+        "The remote request body is too large.": "Тело удалённого запроса слишком велико.",
+        "The remote request nonce is invalid or was already used.": (
+            "Одноразовый идентификатор удалённого запроса некорректен или уже использован."
+        ),
+        "The remote request timeout must be between 1 and 30 seconds.": (
+            "Время ожидания удалённого запроса должно быть от 1 до 30 секунд."
+        ),
+        "The remote request was rejected.": "Удалённый запрос отклонён.",
+        "The remote token is invalid.": "Токен удалённого доступа некорректен.",
+        "The remote-control port must be between 0 and 65535.": (
+            "Порт удалённого управления должен быть от 0 до 65535."
+        ),
+        "This remote command does not accept parameters.": (
+            "Эта удалённая команда не принимает параметры."
+        ),
+        "This remote command is not approved.": "Эта удалённая команда не разрешена.",
+        "This remote hostname is not approved.": "Это имя узла удалённого доступа не разрешено.",
+        "This remote method is not allowed.": "Этот метод удалённого доступа запрещён.",
+        "Too many remote requests. Try again later.": (
+            "Слишком много удалённых запросов. Повторите попытку позже."
+        ),
+        "Use GET for remote status.": "Для получения удалённого состояния используйте GET.",
+        "Use POST for remote commands.": "Для удалённых команд используйте POST.",
+        "Wildcard and multicast remote-control bindings are not allowed.": (
+            "Обобщённые и многоадресные привязки удалённого управления запрещены."
+        ),
+        "Invalid Windows counter error code.": "Некорректный код ошибки счётчика Windows.",
+        "Invalid Windows diagnostic field: {field}.": (
+            "Некорректное поле диагностики Windows: {field}."
+        ),
+        "Invalid Windows disk entry.": "Некорректная запись о диске Windows.",
+        "Invalid Windows disk list.": "Некорректный список дисков Windows.",
+        "Invalid Windows disk operational status.": "Некорректное рабочее состояние диска Windows.",
+        "Invalid or duplicate Windows disk identifier.": (
+            "Идентификатор диска Windows некорректен или повторяется."
+        ),
+        "Reliability counters unavailable for this disk.": (
+            "Счётчики надёжности для этого диска недоступны."
+        ),
+        "The Windows diagnostic response exceeded the size limit.": (
+            "Ответ диагностики Windows превысил допустимый размер."
+        ),
+        "The read-only Windows query failed (exit {code}).": (
+            "Ошибка запроса Windows без изменения данных (код {code})."
+        ),
+        "Windows Storage diagnostics are unavailable on this platform.": (
+            "Диагностика Windows Storage недоступна на этой платформе."
+        ),
+        (
+            "Windows storage provider returned {count} disk(s). Counters may be "
+            "unavailable or driver defaults."
+        ): (
+            "Поставщик данных Windows вернул дисков: {count}. Счётчики могут быть "
+            "недоступны или содержать значения драйвера по умолчанию."
+        ),
+        (
+            "Windows storage query unavailable. Check provider support and permissions; "
+            "no elevation was attempted."
+        ): (
+            "Запрос хранилища Windows недоступен. Проверьте поддержку поставщика и права "
+            "доступа; повышение прав не выполнялось."
+        ),
+        "A major update requires a separate explicit approval.": (
+            "Крупное обновление требует отдельного явного согласия."
+        ),
+        "A newer stable release is available: {version}.": (
+            "Доступна новая стабильная версия: {version}."
+        ),
+        "A release asset exceeds the permitted download size.": (
+            "Файл выпуска превышает допустимый размер загрузки."
+        ),
+        "A stable version must have the form 1.2.3 or v1.2.3.": (
+            "Стабильная версия должна иметь вид 1.2.3 или v1.2.3."
+        ),
+        "A staged update already exists; it was not overwritten.": (
+            "Загруженное обновление уже существует; файл не перезаписан."
+        ),
+        "Cannot reach GitHub to check for updates.": (
+            "Не удалось подключиться к GitHub для проверки обновлений."
+        ),
+        "Explicit approval is required for this release download.": (
+            "Для загрузки этого выпуска необходимо явное согласие."
+        ),
+        "GitHub release checking failed with HTTP {status}.": (
+            "Ошибка проверки выпусков GitHub: HTTP {status}."
+        ),
+        "GitHub release metadata exceeds the permitted size.": (
+            "Метаданные выпуска GitHub превышают допустимый размер."
+        ),
+        "GitHub returned an invalid SHA256 digest.": (
+            "GitHub вернул некорректную контрольную сумму SHA256."
+        ),
+        "GitHub returned duplicate release asset names.": (
+            "GitHub вернул повторяющиеся имена файлов выпуска."
+        ),
+        "GitHub returned invalid release assets.": "GitHub вернул некорректные файлы выпуска.",
+        "GitHub returned invalid release metadata.": (
+            "GitHub вернул некорректные метаданные выпуска."
+        ),
+        "No newer stable release is available.": "Новой стабильной версии нет.",
+        "No published GitHub release is available, or access is denied.": (
+            "Опубликованный выпуск GitHub недоступен либо доступ запрещён."
+        ),
+        "No stable published release is available.": "Опубликованной стабильной версии нет.",
+        "Only a newer checked release can be staged.": (
+            "Загрузить можно только проверенный выпуск более новой версии."
+        ),
+        "Release download failed with HTTP {status}.": "Ошибка загрузки выпуска: HTTP {status}.",
+        "Release integrity verification failed; the download was removed.": (
+            "Проверка целостности выпуска не пройдена; загруженный файл удалён."
+        ),
+        "The release asset does not belong to this repository and tag.": (
+            "Файл выпуска не принадлежит этому репозиторию и тегу."
+        ),
+        "The release contains an unsafe asset filename.": "Выпуск содержит небезопасное имя файла.",
+        "The release contains an untrusted download address.": (
+            "Выпуск содержит недоверенный адрес загрузки."
+        ),
+        "The release could not be safely staged; no update was installed.": (
+            "Не удалось безопасно подготовить выпуск; обновление не установлено."
+        ),
+        "The release download exceeds its declared size.": (
+            "Загрузка выпуска превышает заявленный размер."
+        ),
+        "The release download failed; no update was installed.": (
+            "Не удалось загрузить выпуск; обновление не установлено."
+        ),
+        "The release download has an invalid size.": "Размер загруженного выпуска некорректен.",
+        "The release download has too many or invalid redirects.": (
+            "При загрузке выпуска получены некорректные или слишком многочисленные перенаправления."
+        ),
+        "The release page does not belong to this repository.": (
+            "Страница выпуска не принадлежит этому репозиторию."
+        ),
+        "The selected asset has no verifiable GitHub SHA256 digest.": (
+            "Для выбранного файла нет проверяемой контрольной суммы SHA256 от GitHub."
+        ),
+        "The update staging directory changed during verification.": (
+            "Каталог загрузки обновления изменился во время проверки."
+        ),
+        "The update staging directory must be an absolute path.": (
+            "Путь к каталогу загрузки обновлений должен быть абсолютным."
+        ),
+        "The update staging path is not a directory.": (
+            "Путь загрузки обновлений не является каталогом."
+        ),
+        "Update download cancelled.": "Загрузка обновления отменена.",
+        "Update staging cannot use symbolic links or junctions.": (
+            "Для загрузки обновления нельзя использовать символические ссылки или точки соединения."
+        ),
+        "Explicit speech providers are connected; no automatic recording is enabled.": (
+            "Подключены явно выбранные речевые модули; автоматическая запись отключена."
+        ),
+        "No validated speech provider is connected.": "Проверенный речевой модуль не подключён.",
+        "Speech input must be nonempty audio bytes within the size limit.": (
+            "Речевой ввод должен содержать непустые аудиоданные допустимого размера."
+        ),
+        "Speech output must be nonempty text within the size limit.": (
+            "Для озвучивания нужен непустой текст допустимого размера."
+        ),
+        "Speech output must contain valid Unicode text.": (
+            "Текст для озвучивания должен содержать корректный Unicode."
+        ),
+        "Speech playback failed: {error}": "Ошибка воспроизведения речи: {error}",
+        "Speech playback is unavailable for this language.": (
+            "Воспроизведение речи для этого языка недоступно."
+        ),
+        "Speech provider check failed: {error}": "Ошибка проверки речевого модуля: {error}",
+        "Speech recognition failed: {error}": "Ошибка распознавания речи: {error}",
+        "Speech recognition is unavailable for this language.": (
+            "Распознавание речи для этого языка недоступно."
+        ),
+        "The speech operation was cancelled.": "Речевая операция отменена.",
+        "The speech provider returned an invalid transcript.": (
+            "Речевой модуль вернул некорректный распознанный текст."
+        ),
+        "The speech provider returned invalid capabilities.": (
+            "Речевой модуль вернул некорректные сведения о возможностях."
+        ),
+        ("Voice assistance is unavailable without validated recognition and speech providers."): (
+            "Голосовой помощник недоступен без проверенных модулей распознавания и "
+            "воспроизведения речи."
+        ),
+        "Remote control": "Удалённое управление",
+        "Russian": "Русский",
+        "English": "Английский",
+        "Pairing token": "Токен сопряжения",
+        "Connect": "Подключиться",
+        "Status": "Состояние",
+        "Stop generation": "Остановить генерацию",
+        "Apply profile": "Применить профиль",
+        "Keep this page on a trusted local network. No hardware writes are available.": (
+            "Используйте эту страницу только в доверенной локальной сети. Изменение "
+            "настроек оборудования недоступно."
+        ),
+        "Enter the token shown in NEXUS AI. It is kept only in this page memory.": (
+            "Введите токен из NEXUS AI. Он хранится только в памяти этой страницы."
+        ),
+        "Connection failed. Verify the certificate, address and token.": (
+            "Не удалось подключиться. Проверьте сертификат, адрес и токен."
+        ),
+        "Connected": "Подключено",
+    }
+)
+
+RU.update(
+    {
+        "Add game": "Добавить игру",
+        "Allow unloading models used by NEXUS for this game": (
+            "Разрешить выгрузку моделей NEXUS для этой игры"
+        ),
+        "Approve download": "Разрешить загрузку",
+        "Approve major update": "Разрешить крупное обновление",
+        "Cancel download": "Отменить загрузку",
+        "Check GitHub Releases": "Проверить выпуски GitHub",
+        "Check failed: {error}": "Ошибка проверки: {error}",
+        "Checking in the background…": "Проверка в фоновом режиме…",
+        "Completed conversations are saved locally on this computer.": (
+            "Завершённые ответы сохраняются локально на этом компьютере."
+        ),
+        "Consumed wear: {value}% (not remaining health)": (
+            "Израсходованный ресурс: {value}% (это не остаток ресурса)"
+        ),
+        "Conversation deleted.": "Беседа удалена.",
+        "Conversation restored from local storage.": (
+            "Беседа восстановлена из локального хранилища."
+        ),
+        "Conversation saved locally.": "Беседа сохранена локально.",
+        "Delete conversation": "Удалить беседу",
+        "Detected names are evidence only; RGB and fan controls remain disabled.": (
+            "Обнаруженные имена подтверждают только наличие устройств; управление RGB и "
+            "вентиляторами отключено."
+        ),
+        "Disk: {name} ({kind}, {bus})": "Диск: {name} ({kind}, {bus})",
+        "Download and verify": "Загрузить и проверить",
+        "Download and verify {asset}? No installation will run.": (
+            "Загрузить и проверить {asset}? Установка не будет запущена."
+        ),
+        "Enable automatic game detection": "Включить автоматическое обнаружение игр",
+        "Executable names separated by semicolons, e.g. game.exe; launcher.exe": (
+            "Имена исполняемых файлов через точку с запятой, например game.exe; launcher.exe"
+        ),
+        "Game Guard error: {detail}": "Ошибка защиты игрового режима: {detail}",
+        "Game name": "Название игры",
+        "Installation unavailable": "Установка недоступна",
+        "New conversation": "Новая беседа",
+        "New conversation. Completed turns will be saved locally.": (
+            "Новая беседа. Завершённые ответы будут сохранены локально."
+        ),
+        "No candidate detected": "Подходящее устройство не обнаружено",
+        "No verifiable SHA256; download disabled": (
+            "Нет проверяемой суммы SHA256; загрузка отключена"
+        ),
+        "Not checked. Run a read-only check when ready.": (
+            "Проверка не выполнялась. Запустите диагностику без изменения устройств."
+        ),
+        (
+            "Only configured executable names are detected. No processes are stopped. "
+            "Ollama model residency is shared: unloading a NEXUS-used model can affect "
+            "other clients using that same model."
+        ): (
+            "Обнаруживаются только заданные имена исполняемых файлов. Процессы не "
+            "останавливаются. Модели Ollama общие для всех клиентов: выгрузка модели "
+            "NEXUS может повлиять на другие приложения, использующие ту же модель."
+        ),
+        "Only stable releases from misha2271/NEXUS-AI are checked.": (
+            "Проверяются только стабильные выпуски misha2271/NEXUS-AI."
+        ),
+        "Permanently delete this locally saved conversation?": (
+            "Безвозвратно удалить эту локально сохранённую беседу?"
+        ),
+        "Power-on hours: {value}": "Время работы, ч: {value}",
+        "Provider health: {health}; operations: {operations}": (
+            "Состояние по данным поставщика: {health}; работа: {operations}"
+        ),
+        "Read XInput state": "Получить состояние XInput",
+        "Read errors: {read}; write errors: {write}": (
+            "Ошибки чтения: {read}; ошибки записи: {write}"
+        ),
+        ("Read-only XInput snapshot. Elite identity, paddles and rumble are not supported."): (
+            "Снимок состояния XInput без управления устройством. Определение модели "
+            "Elite, лепестки и вибрация не поддерживаются."
+        ),
+        "Refresh conversations": "Обновить список бесед",
+        "Remove selected game": "Удалить выбранную игру",
+        "Restore NEXUS model on demand": "Загрузить модель NEXUS по запросу",
+        "Resume conversation": "Продолжить беседу",
+        "Run read-only diagnostics": "Запустить диагностику без изменения устройств",
+        "SHA256 available": "Сумма SHA256 доступна",
+        "SHA256 verifies integrity against GitHub metadata, not publisher identity.": (
+            "SHA256 проверяет целостность по метаданным GitHub, но не подлинность издателя."
+        ),
+        "SHA256: {digest}": "SHA256: {digest}",
+        "Slot {slot}: buttons {buttons}": "Слот {slot}: кнопки {buttons}",
+        "Some XInput slots could not be read. No controls were written.": (
+            "Не удалось прочитать некоторые слоты XInput. Команды управления не отправлялись."
+        ),
+        "Sticks: left ({lx}, {ly}), right ({rx}, {ry})": (
+            "Стики: левый ({lx}, {ly}), правый ({rx}, {ry})"
+        ),
+        "Temperature: {value} °C": "Температура: {value} °C",
+        "The Windows XInput provider is unavailable.": (
+            "Поставщик данных XInput в Windows недоступен."
+        ),
+        "This changes the major version. Explicitly approve this download?": (
+            "Обновление меняет основную версию. Явно разрешить эту загрузку?"
+        ),
+        "Triggers: left {left}, right {right}": "Курки: левый {left}, правый {right}",
+        "Untitled conversation": "Без названия",
+        "Update download cancellation requested.": "Запрошена отмена загрузки обновления.",
+        "Verified download saved to {path}. Nothing was installed.": (
+            "Проверенный файл сохранён: {path}. Установка не выполнялась."
+        ),
+        "Wait for the model operation before changing the server.": (
+            "Дождитесь завершения операции с моделью перед сменой сервера."
+        ),
+        "Windows Storage reliability counters; unavailable fields are not estimates.": (
+            "Счётчики надёжности Windows Storage; недоступные значения не заменяются оценками."
+        ),
+        "XInput diagnostics require native Windows.": "Для диагностики XInput требуется Windows.",
+        "XInput returned {count} connected controller(s).": (
+            "Подключённых контроллеров по данным XInput: {count}."
+        ),
+    }
+)
+
+RU.update(
+    {
+        "Approved command completed.": "Разрешённая команда выполнена.",
+        "Check GitHub Releases and verify explicitly approved downloads.": (
+            "Проверяйте выпуски GitHub и целостность загрузок, на которые вы явно согласились."
+        ),
+        (
+            "Checks use the official repository. Downloads require explicit approval and "
+            "a GitHub SHA-256 asset digest; major updates need separate approval. Hash "
+            "verification is not publisher signing. Installation remains unavailable."
+        ): (
+            "Проверяется официальный репозиторий. Для загрузки нужны явное согласие и "
+            "сумма SHA-256 файла от GitHub; крупные обновления требуют отдельного "
+            "согласия. Контрольная сумма не заменяет подпись издателя. Установка "
+            "недоступна."
+        ),
+        "Current profile: {profile}": "Текущий профиль: {profile}",
+        "Local bind address": "Локальный адрес прослушивания",
+        "Microphone and speech · unavailable": "Микрофон и речь · недоступно",
+        (
+            "Opt-in exact executable detection switches inference profiles and restores "
+            "the previous profile on game exit. Only NEXUS-used models may be unloaded "
+            "with consent. FPS capture, OS tuning, and fan control remain unavailable."
+        ): (
+            "После явного включения обнаружение точных имён исполняемых файлов "
+            "переключает профиль вычислений и восстанавливает предыдущий при выходе из "
+            "игры. С согласия пользователя выгружаются только модели, использованные "
+            "NEXUS. Измерение FPS, настройка ОС и управление вентиляторами недоступны."
+        ),
+        "Port (0 selects an available port)": "Порт (0 — выбрать свободный)",
+        (
+            "Read-only Windows hardware inventory can identify candidates, not SDK "
+            "support. No RGB SDK is validated; no HID packets or lighting commands are "
+            "sent."
+        ): (
+            "Сведения об оборудовании Windows позволяют найти возможные устройства, но не"
+            " подтверждают поддержку SDK. Проверенного SDK для RGB нет; пакеты HID и "
+            "команды подсветки не отправляются."
+        ),
+        "Read-only diagnostics for standard XInput controller slots.": (
+            "Диагностика стандартных слотов контроллеров XInput без изменения устройств."
+        ),
+        "Remote control is listening at {address}.": (
+            "Удалённое управление ожидает подключения по адресу {address}."
+        ),
+        (
+            "Remote control is off by default. LAN access requires your own trusted TLS "
+            "certificate. Approved commands: status, stop generation and change profile."
+        ): (
+            "Удалённое управление по умолчанию отключено. Для доступа по локальной сети "
+            "нужен ваш доверенный сертификат TLS. Разрешённые команды: состояние, "
+            "остановка генерации и смена профиля."
+        ),
+        "Remote control is stopped.": "Удалённое управление остановлено.",
+        "Run approved text command": "Выполнить разрешённую текстовую команду",
+        "Show pairing token": "Показать токен сопряжения",
+        "Start remote control": "Запустить удалённое управление",
+        "Stop remote control": "Остановить удалённое управление",
+        "TLS certificate file": "Файл сертификата TLS",
+        "TLS private key file": "Файл закрытого ключа TLS",
+        "Text command, e.g. статус or игровой режим": (
+            "Текстовая команда, например «статус» или «игровой режим»"
+        ),
+        "The application is closing.": "Приложение закрывается.",
+        "This command is not allowed.": "Эта команда не разрешена.",
+        "Update selected game": "Обновить выбранную игру",
+        "Voice and remote access": "Голос и удалённый доступ",
+        (
+            "Windows XInput reports connected slots, buttons, axes, and battery "
+            "information when available. Elite-specific paddles, rumble, calibration, and"
+            " firmware writes remain unavailable. A slot does not identify an Elite "
+            "model."
+        ): (
+            "Windows XInput сообщает о подключённых слотах, кнопках, осях и батарее, если"
+            " данные доступны. Лепестки Elite, вибрация, калибровка и изменение прошивки "
+            "недоступны. Номер слота не определяет модель Elite."
+        ),
+        "Write drive firmware": "Записать прошивку диска",
+        "You": "Вы",
+        "ON DEMAND · NO HARDWARE WRITES": "ПО ЗАПРОСУ · БЕЗ ИЗМЕНЕНИЯ УСТРОЙСТВ",
+    }
+)
+
+RU.update(
+    {
+        (
+            "Xbox-family PnP names do not prove Elite Series 2 identity or paddle support. "
+            "Standard XInput state can be read separately; Elite features, GameInput and rumble "
+            "remain unvalidated and disabled."
+        ): (
+            "Имена PnP семейства Xbox не подтверждают модель Elite Series 2 или поддержку "
+            "лепестков. Стандартное состояние XInput можно прочитать отдельно; функции Elite, "
+            "GameInput и вибрация не проверены и отключены."
+        ),
+    }
+)
+
+RU.update(
+    {
+        (
+            "Read-only Windows Storage reliability counters report only fields exposed by the "
+            "drive and driver. Missing counters remain unavailable; wear is consumed wear, "
+            "not a computed health score. No drive writes are performed."
+        ): (
+            "Счётчики надёжности Windows Storage доступны только для чтения и показывают "
+            "лишь данные, предоставленные диском и драйвером. Отсутствующие счётчики остаются "
+            "недоступными; износ означает израсходованный ресурс, а не расчётную оценку "
+            "состояния. Запись на диск не выполняется."
+        ),
+    }
+)
+
+RU.update(
+    {
+        (
+            "A clear space to think.\n\nChoose an installed model, then start a conversation.\n"
+            "Completed turns are saved locally; prompts go to your configured Ollama server."
+        ): (
+            "Пространство для ваших идей.\n\nВыберите установленную модель и начните беседу.\n"
+            "Завершённые ответы сохраняются локально; запросы отправляются на указанный "
+            "вами сервер Ollama."
+        ),
+        (
+            "Windows XInput reports connected slots, buttons, triggers, and stick axes when "
+            "available. Elite-specific paddles, rumble, calibration, and firmware writes "
+            "remain unavailable. A slot does not identify an Elite model."
+        ): (
+            "Windows XInput сообщает о подключённых слотах, кнопках, курках и осях стиков, "
+            "если данные доступны. Лепестки Elite, вибрация, калибровка и изменение прошивки "
+            "недоступны. Номер слота не определяет модель Elite."
+        ),
+    }
+)

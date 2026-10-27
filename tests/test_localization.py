@@ -15,6 +15,7 @@ import httpx
 import pytest
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QComboBox, QDialogButtonBox, QLabel, QLineEdit
+from shiboken6 import isValid
 
 from nexus_ai.i18n import JoinedText, Text, error_text, render
 from nexus_ai.modules import MODULES
@@ -46,9 +47,14 @@ def windows(qtbot, tmp_path):
     for release in releases:
         release.set()
     for window in instances:
+        if not isValid(window):
+            continue
         window.close()
         qtbot.waitUntil(
-            lambda window=window: not window.isVisible() and not window._jobs, timeout=6000
+            lambda window=window: (
+                not isValid(window) or (not window.isVisible() and not window._jobs)
+            ),
+            timeout=6000,
         )
 
 

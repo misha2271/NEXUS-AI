@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexus-ai-desktop"
-version = "0.4.0"
+version = "1.0.0"
 description = "Local Ollama chat and real hardware telemetry for Windows 11."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,8 +16,9 @@ dependencies = [
 
 [project.optional-dependencies]
 nvidia = ["nvidia-ml-py>=12,<14"]
-dev = ["pytest>=8,<10", "pytest-qt>=4.4,<5", "ruff>=0.9,<1", "build>=1.2,<2"]
+dev = ["pytest>=8,<10", "pytest-qt>=4.4,<5", "pytest-timeout>=2.3,<3", "ruff>=0.9,<1", "build>=1.2,<2"]
 freeze = ["pyinstaller>=6.11,<7"]
+security = ["bandit>=1.8,<2", "pip-audit>=2.9,<3"]
 
 [project.gui-scripts]
 nexus-ai = "nexus_ai.app:main"
@@ -28,6 +29,8 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 qt_api = "pyside6"
+timeout = 60
+timeout_method = "thread"
 
 [tool.ruff]
 target-version = "py311"

@@ -54,6 +54,10 @@ def pyinstaller_command(root: Path, mode: str) -> list[str]:
         "PySide6.QtWidgets",
         "psutil._psutil_windows",
         "pynvml",  # Loaded with importlib by the optional hardware backend.
+        "sqlite3",
+        "ssl",
+        "http.server",
+        "ctypes",
     ):
         command.extend(("--hidden-import", module))
     command.extend(("--collect-data", "certifi"))
@@ -155,6 +159,8 @@ def build(mode: str, root: Path) -> list[Path]:
         if "onedir" in verified:
             directory = verified["onedir"].parent
             shutil.copy2(root / "README.md", directory / "README.md")
+            if (root / "README.ru.md").is_file():
+                shutil.copy2(root / "README.ru.md", directory / "README.ru.md")
             archive_onedir(directory, portable)
             artifacts.append(portable)
         checksums.write_text(

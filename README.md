@@ -1,4 +1,8 @@
-# NEXUS AI 0.4
+# NEXUS AI 1.0 — development preview
+
+**[Русская документация](README.ru.md)** · [Game Center](docs/gaming.md) ·
+[Storage / hardware](docs/hardware-interfaces.md) · [Update security](docs/update-security.md) ·
+[Voice and conversations](docs/conversations-voice.md) · [Remote access](docs/remote-control.md)
 
 A Windows 11 desktop application for local Ollama chat and real hardware monitoring.
 Built with Python 3.11+ and PySide6, with a dark interface and background workers
@@ -13,6 +17,30 @@ for network requests and telemetry, with sidebar workspaces and bounded historic
 Telemetry is never simulated. Missing NVIDIA support displays an unavailable
 status; it does not prevent CPU/RAM monitoring or chat. Missing Ollama displays a
 connection error while the rest of the application remains usable.
+
+## v1.0 implementation status
+
+This is an unreleased development preview in draft PR #4, stacked on the unmerged
+localized v0.4 branch. No release or automatic installation is performed.
+
+| Feature | Working behavior and limits |
+| --- | --- |
+| Game Center / Game Guard | Add, edit and remove named game EXE lists; persist configuration; opt-in background process detection; switch inference mode while playing and restore the selected base profile afterwards. No process termination or OS tuning. |
+| Ollama lifecycle | Use supported model load/unload endpoints in workers. Automatic unloading requires per-game consent and a model successfully used by this NEXUS session at this endpoint. No unrelated model is unloaded; shared use of the same model by another client remains an Ollama limitation. Model restoration is on demand. |
+| AI conversations | Completed turns stored locally in SQLite; explicitly resume, start or delete conversations. Cancelled and failed replies are excluded. Prompts and replies are plaintext local data; do not enter secrets. |
+| SSD diagnostics | Read-only Windows `Get-PhysicalDisk` / `Get-StorageReliabilityCounter`; display only counters exposed by the actual driver. Missing SMART fields remain unavailable. Wear is consumed wear, not remaining health. |
+| Gamepad Lab | Read-only standard Windows XInput slots, button and stick snapshots. No Elite identity, paddles, rumble, calibration or firmware support is claimed. |
+| Updates | Check the official repository's stable GitHub Releases on request. Explicitly approve downloads; SHA-256 digest and byte count are required; major-version downloads require an additional confirmation. No automatic update installation or code-signature claim. |
+| Russian voice foundation | Validated-provider STT/TTS contracts and an actual allowlisted Russian/English **text** command router. No bundled microphone capture, wake word, audio recognition or synthesis. |
+| iPhone remote foundation | Disabled by default. Token-authenticated web interface, bounded requests, replay protection and approved status/stop/profile commands. Loopback HTTP for local testing; LAN binds require a user-supplied trusted TLS certificate. No physical iPhone validation yet. |
+| MSI / G560 / cooling | Read-only Windows device inventory and documented official interfaces. Candidate names do not establish SDK support. RGB, fan and audio writes remain disabled. |
+
+All process, storage, device, database and network operations run outside Qt's UI
+thread. Shutdown waits asynchronously for bounded work; it never kills unrelated
+processes. See [security checks](docs/security.md) and [validation](docs/v1-validation.md) and [release checklist](docs/release-checklist-v1.md).
+Real Windows sensor availability and physical device behavior remain unverified
+until tested on the target computer. CI smoke tests validate packaging and UI,
+not possession of any particular hardware.
 
 ## v0.4 dashboard
 
@@ -29,10 +57,8 @@ connection error while the rest of the application remains usable.
   rendering. Persistent endpoint/model preferences and all four existing profiles
   remain compatible with v0.3 settings files.
 - **Device workspaces:** Gaming, RGB Studio, Logitech G560, Gamepad Lab, SSD Health,
-  and Update Center have explicit module/provider contracts and unavailable-state
-  pages. Gaming can apply the existing inference profile. No game detection, FPS
-  capture, lighting, speaker, gamepad, SMART, firmware, or updater SDK is implemented.
-  RGB and fan writes stay disabled; no placeholder is advertised as working.
+  and Update Center preserve the v0.4 routes. See the v1.0 implementation status below.
+  RGB, fan, speaker, firmware, and update installation controls stay disabled.
 
 Windows CPU temperatures are **unavailable without a supported sensor backend**;
 this version does not bundle a kernel driver or LibreHardwareMonitor integration.
@@ -85,11 +111,11 @@ adding these scripts or passing tests on Linux does not produce a Windows binary
 From a successful **Windows executable builds** run on the repository's Actions
 page, download either of these artifacts:
 
-- **`NEXUS-AI-0.4.0-windows-x64-onefile`**: extract the artifact download and run
+- **`NEXUS-AI-1.0.0-windows-x64-onefile`**: extract the artifact download and run
   `NEXUS-AI.exe`. This variant contains the application, Python runtime, and Qt
   libraries in a single EXE and extracts its runtime to a temporary folder on
   launch. Startup can be slower than the directory build.
-- **`NEXUS-AI-0.4.0-windows-x64-portable`**: extract the artifact download, then
+- **`NEXUS-AI-1.0.0-windows-x64-portable`**: extract the artifact download, then
   extract `NEXUS-AI-Portable.zip`. Run
   `NEXUS-AI\NEXUS-AI.exe` and keep the entire `NEXUS-AI` directory together.
   The EXE in this variant depends on its accompanying files and is not standalone
@@ -98,7 +124,8 @@ page, download either of these artifacts:
 Neither distribution needs a separate Python installation. Both still require
 Ollama and a downloaded model for inference, and NVIDIA drivers for optional GPU
 telemetry. They do not include Ollama, models, or NVIDIA driver DLLs. The build
-configuration does not sign executables or create an installer.
+configuration does not sign executables. A separate native Inno Setup stage builds
+and validates the per-user installer.
 
 Settings remain in `%APPDATA%\NEXUS AI\settings.json` across restarts and updates.
 They are never written beside the EXE or into PyInstaller's temporary extraction
@@ -202,7 +229,7 @@ Windows 11 machine without Python or validating real Ollama/NVIDIA hardware.
 The workflow `.github/workflows/windows-build.yml` performs these native builds
 on `windows-latest` with Python 3.11 x64. It runs tests and lint first, then
 uploads the onefile EXE, portable ZIP, checksums, and smoke reports. It also
-publishes `NEXUS-AI-0.4.0-source.zip`, containing the complete tracked source,
+publishes `NEXUS-AI-1.0.0-source.zip`, containing the complete tracked source,
 tests, packaging scripts, and workflows. It runs for pull requests into `main`, pushes to `main`, and manual dispatch;
 feature-branch pushes do not duplicate the PR build. Artifact retention is 14 days. A failed
 build does not publish binary artifacts; source and available diagnostics can
@@ -231,8 +258,8 @@ launch Ollama, or contact a hosted AI provider automatically.
 Stop is cooperative: it stops between received chunks. If the server stalls,
 an outstanding read may take up to the configured 60-second read timeout to
 finish. Connection establishment has a separate 5-second timeout. The UI remains
-responsive during network operations. Chat history is held in memory for the
-current session; it is not saved to disk.
+responsive during network operations. Completed turns are stored in a local SQLite conversation database and persist
+between launches. The request context is bounded to the latest 40 messages.
 
 ## Performance profiles
 
@@ -360,7 +387,7 @@ pyproject.toml
   Model availability is reported by Ollama, not inferred from the hardware.
 - **NVIDIA unavailable:** install the optional binding and supported drivers;
   restart the app after changing the driver or dependency. Integrated, AMD, and
-  Intel GPU telemetry is outside v0.4 scope.
+  Intel GPU telemetry remains unsupported.
 - **A metric is unavailable:** some NVML counters are unsupported on particular
   devices or drivers. Unsupported counters are shown as unavailable, not zero.
 - **Large-model errors:** reduce the model size or context/profile budget. This
@@ -369,7 +396,23 @@ pyproject.toml
 - **Standalone build fails to launch:** keep the complete onedir folder together,
   inspect the smoke reports, and confirm the binary was built for x64 Windows.
   Onefile execution requires a writable temporary directory. The workflow does
-  not sign binaries or produce an installer.
-- Settings contain preferences only. Conversation persistence, authentication
-  configuration for remote Ollama servers, voice, model training, and OS tuning
-  are outside this foundation release.
+  not sign binaries; the per-user installer has a separate installation smoke test.
+- Settings contain preferences only; conversations use a separate local database.
+  Audio recognition/synthesis, authenticated remote Ollama credentials, model training,
+  and OS tuning remain unsupported. The separate remote-control foundation does not
+  add authentication to your configured Ollama server.
+
+
+## Windows installer (development builds)
+
+The native workflow also prepares **NEXUS-AI-Setup-1.0.0.exe** from the validated
+portable directory. Download the installer artifact only from a successful run.
+Setup installs per user without administrator privileges and offers Russian and
+English. It includes the Python/Qt runtime, not Ollama or a language model.
+The pipeline must silently install it, run the installed executable twice with
+Python removed from PATH, then uninstall it before uploading the installer and
+its SHA256. User settings and conversations are preserved by uninstall.
+
+Builds are unsigned: Windows SmartScreen behavior requires manual acceptance
+testing. No release is published by the build workflow. See the
+[release checklist](docs/release-checklist-v1.md).

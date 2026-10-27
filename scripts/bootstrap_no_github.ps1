@@ -1,4 +1,4 @@
-# NEXUS AI v0.4 Windows builder - no GitHub or Git required.
+# NEXUS AI v1.0 Windows builder - no GitHub or Git required.
 # Uses an already installed Python 3.11-3.13 or installs Python 3.11 via winget.
 # Python packages download from PyPI. Actual Windows builds run on this PC.
 $ErrorActionPreference = 'Stop'

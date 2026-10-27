@@ -7,6 +7,7 @@ chunks; an in-flight network read is bounded by the configured read timeout.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from threading import Event
 from typing import Any, Iterator
@@ -94,6 +95,105 @@ class OllamaClient:
                 raise OllamaError(Text("Ollama returned an invalid model size."))
             result.append(OllamaModel(name=name, size_bytes=size))
         return result
+
+    def running_models(self) -> list[OllamaModel]:
+        """Read actual loaded model names from the supported GET /api/ps endpoint."""
+        try:
+            response = self._client.get("api/ps")
+            self._check_status(response)
+            payload = self._decode_object(response.text)
+        except httpx.RequestError as exc:
+            raise self._network_error(exc) from exc
+        if "error" in payload:
+            raise OllamaError(Text("Ollama: {detail}", detail=payload["error"]))
+        entries = payload.get("models")
+        if not isinstance(entries, list):
+            raise OllamaError(Text("Ollama returned an invalid running-model list."))
+        result = []
+        for item in entries:
+            if not isinstance(item, dict):
+                raise OllamaError(Text("Ollama returned an invalid running-model entry."))
+            name = item.get("name", item.get("model"))
+            size = item.get("size")
+            if not isinstance(name, str) or not name.strip():
+                raise OllamaError(Text("Ollama returned an invalid running-model entry."))
+            if size is not None and (type(size) is not int or size < 0):
+                raise OllamaError(Text("Ollama returned an invalid model size."))
+            result.append(OllamaModel(name, size))
+        return result
+
+    @staticmethod
+    def _validate_lifecycle_model(model: str) -> str:
+        if isinstance(model, str) and not model.strip():
+            raise OllamaError(Text("Select an installed model before sending a message."))
+        if isinstance(model, str) and not any(char in model for char in "\r\n\t"):
+            model = model.strip(" ")
+        if (
+            not isinstance(model, str)
+            or not model
+            or len(model) > 512
+            or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in model)
+        ):
+            raise ValueError(Text("Select a valid installed model for lifecycle operations."))
+        return model
+
+    def unload_model(self, model: str) -> None:
+        """Unload only the specified model via /api/generate; never stop the server.
+
+        An unload changes the server-wide model residency, including other clients
+        using the same model. Callers must obtain consent and serialize against
+        their own chat jobs. A done_reason=unload acknowledgement is required.
+        """
+        self._lifecycle_request(model, keep_alive=0, operation="unload")
+
+    def load_model(self, model: str, *, keep_alive: str | int = "5m") -> None:
+        """Explicit demand-driven warm load; this does not download model files."""
+        seconds = None
+        if type(keep_alive) is int:
+            seconds = keep_alive
+        elif isinstance(keep_alive, str):
+            match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)(ms|s|m|h)", keep_alive)
+            if match:
+                seconds = float(match[1]) * {"ms": 0.001, "s": 1, "m": 60, "h": 3600}[match[2]]
+        if seconds is None or not 0 < seconds <= 86400:
+            raise ValueError(Text("Model retention must be positive and at most 24 hours."))
+        self._lifecycle_request(model, keep_alive=keep_alive, operation="load")
+
+    def _lifecycle_request(self, model: str, *, keep_alive: str | int, operation: str) -> None:
+        model = self._validate_lifecycle_model(model)
+        try:
+            response = self._client.post(
+                "api/generate",
+                json={
+                    "model": model,
+                    "prompt": "",
+                    "stream": False,
+                    "keep_alive": keep_alive,
+                },
+            )
+            self._check_status(response, model=model)
+            payload = self._decode_object(response.text)
+        except httpx.RequestError as exc:
+            raise self._network_error(exc) from exc
+        if "error" in payload:
+            raise OllamaError(self._server_error(payload["error"], model))
+        aliases = {model}
+        if ":" not in model.rsplit("/", 1)[-1]:
+            aliases.add(model + ":latest")
+        if payload.get("done") is not True:
+            raise OllamaError(Text("Ollama returned an invalid 'done' marker."))
+        if (
+            payload.get("response", "") != ""
+            or (
+                "model" in payload
+                and (not isinstance(payload["model"], str) or payload["model"] not in aliases)
+            )
+            or (operation == "unload" and payload.get("done_reason") != "unload")
+            or (operation == "load" and payload.get("done_reason") not in (None, "load", "stop"))
+        ):
+            raise OllamaError(
+                Text("Ollama did not acknowledge the requested model lifecycle operation.")
+            )
 
     def stream_chat(
         self,

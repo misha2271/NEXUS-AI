@@ -192,7 +192,14 @@ class ModulePage(QWidget):
         body = QVBoxLayout(panel)
         body.setContentsMargins(24, 24, 24, 24)
         body.setSpacing(18)
-        body.addWidget(label("NOT CONNECTED · NO VALIDATED PROVIDER", "unavailable"))
+        body.addWidget(
+            label(
+                "ON DEMAND · NO HARDWARE WRITES"
+                if spec.key in {"gaming", "ssd", "updates", "gamepad"}
+                else "NOT CONNECTED · NO VALIDATED PROVIDER",
+                "unavailable",
+            )
+        )
         body.addWidget(label(spec.requirements, "body"))
         body.addWidget(label("Hardware controls remain locked until a supported SDK is validated."))
         self.controls: list[QPushButton] = []

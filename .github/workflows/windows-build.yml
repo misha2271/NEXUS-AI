@@ -2,13 +2,17 @@ name: Windows executable builds
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/nexus-ai-v1.0]
   pull_request:
-    branches: [main]
+    branches: [main, feature/nexus-ai-v0.4-dashboard]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -40,18 +44,36 @@ jobs:
       - name: Run tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m pytest -q
+        run: python scripts/run_tests.py
       - name: Build and smoke-test both Windows executables
         run: python scripts/build_windows.py --mode both
+      - name: Locate or install the verified Inno Setup compiler
+        run: |
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 7\ISCC.exe"
+          )
+          $compiler = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $compiler) {
+            choco install innosetup --yes --no-progress --limit-output --require-checksums --source=https://community.chocolatey.org/api/v2/
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $compiler = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          }
+          if (-not $compiler) { throw "Inno Setup ISCC.exe was not found after installation." }
+          "ISCC_PATH=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Build and test the per-user Windows installer
+        run: python scripts/build_installer.py --iscc "$env:ISCC_PATH"
       - name: Archive complete source
         if: always()
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          git archive --format=zip --prefix=NEXUS-AI-0.4.0/ --output=dist/NEXUS-AI-0.4.0-source.zip HEAD
+          git archive --format=zip --prefix=NEXUS-AI-1.0.0/ --output=dist/NEXUS-AI-1.0.0-source.zip HEAD
       - name: Upload standalone onefile EXE
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.4.0-windows-x64-onefile
+          name: NEXUS-AI-1.0.0-windows-x64-onefile
           path: dist/NEXUS-AI.exe
           compression-level: 0
           if-no-files-found: error
@@ -59,7 +81,7 @@ jobs:
       - name: Upload portable onedir ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.4.0-windows-x64-portable
+          name: NEXUS-AI-1.0.0-windows-x64-portable
           path: dist/NEXUS-AI-Portable.zip
           compression-level: 0
           if-no-files-found: error
@@ -67,16 +89,24 @@ jobs:
       - name: Upload binary checksums
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.4.0-windows-x64-checksums
+          name: NEXUS-AI-1.0.0-windows-x64-checksums
           path: dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload tested per-user installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-AI-1.0.0-windows-x64-installer
+          path: dist/NEXUS-AI-Setup-1.0.0.exe
+          compression-level: 0
           if-no-files-found: error
           retention-days: 14
       - name: Upload complete source archive
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.4.0-source
-          path: dist/NEXUS-AI-0.4.0-source.zip
+          name: NEXUS-AI-1.0.0-source
+          path: dist/NEXUS-AI-1.0.0-source.zip
           compression-level: 0
           if-no-files-found: error
           retention-days: 14
@@ -84,7 +114,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: NEXUS-AI-0.4.0-windows-x64-smoke-reports
+          name: NEXUS-AI-1.0.0-windows-x64-smoke-reports
           path: dist/smoke/
           if-no-files-found: warn
           retention-days: 14

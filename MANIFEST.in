@@ -1,5 +1,6 @@
 include .gitignore
 include Build-Windows.cmd
+include README.ru.md
 graft .github
 graft packaging
 graft scripts

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 
 import pytest
 from PySide6.QtCore import QRunnable
+from shiboken6 import isValid
 
 from nexus_ai.ollama import OllamaError, OllamaModel
 from nexus_ai.settings import SettingsStore
@@ -96,13 +97,20 @@ def make_window(qtbot, tmp_path):
         if api.discovery_release is not None:
             api.discovery_release.set()
     for window in windows:
+        # Qt may have destroyed a widget before this fixture's finalizer runs.
+        # Never query C++ child objects through an invalid Python wrapper.
+        if not isValid(window):
+            continue
         window.close()
         qtbot.waitUntil(
             lambda window=window: (
-                not window._jobs
-                and not window._pool.activeThreadCount()
-                and (window._monitor_thread is None or not window._monitor_thread.isRunning())
-                and not window.isVisible()
+                not isValid(window)
+                or (
+                    not window._jobs
+                    and not window._pool.activeThreadCount()
+                    and (window._monitor_thread is None or not window._monitor_thread.isRunning())
+                    and not window.isVisible()
+                )
             ),
             timeout=7000,
         )

@@ -44,16 +44,17 @@ MODULES = (
         "gaming",
         "Gaming",
         "A quieter inference budget while you play.",
-        "The existing Gaming profile changes Ollama request options only. Game detection, "
-        "FPS capture, OS tuning, and fan control are not implemented.",
+        "Opt-in exact executable detection switches inference profiles and restores the previous "
+        "profile on game exit. Only NEXUS-used models may be unloaded with consent. "
+        "FPS capture, OS tuning, and fan control remain unavailable.",
         ("Fan control",),
     ),
     ModuleSpec(
         "rgb",
         "RGB Studio",
         "A future home for supported lighting devices.",
-        "No RGB SDK is connected or validated. Device discovery and lighting writes are "
-        "unavailable; no HID packets or device commands are sent.",
+        "Read-only Windows hardware inventory can identify candidates, not SDK support. "
+        "No RGB SDK is validated; no HID packets or lighting commands are sent.",
         ("Apply lighting",),
     ),
     ModuleSpec(
@@ -67,27 +68,29 @@ MODULES = (
     ModuleSpec(
         "gamepad",
         "Gamepad Lab",
-        "A future workspace for controller diagnostics.",
-        "No controller backend is connected. Input capture, rumble, calibration, and "
-        "firmware operations require a validated provider.",
+        "Read-only diagnostics for standard XInput controller slots.",
+        "Windows XInput reports connected slots, buttons, triggers, and stick axes "
+        "when available. Elite-specific paddles, rumble, calibration, and firmware writes "
+        "remain unavailable. A slot does not identify an Elite model.",
         ("Test rumble",),
     ),
     ModuleSpec(
         "ssd",
         "SSD Health",
         "Health information from supported storage providers.",
-        "No SMART/NVMe health provider is connected. Health, endurance, and drive temperature "
-        "are unavailable. Filesystem free space is not a drive health measurement.",
-        ("Read SMART",),
+        "Read-only Windows Storage reliability counters report only fields exposed by the "
+        "drive and driver. Missing counters remain unavailable; wear is consumed wear, "
+        "not a computed health score. No drive writes are performed.",
+        ("Write drive firmware",),
     ),
     ModuleSpec(
         "updates",
         "Update Center",
-        "Installed version and future update verification.",
-        "Automatic update checks and installers are not implemented. A future provider must "
-        "verify signed metadata and artifacts before offering an update. Nothing is downloaded "
-        "or installed automatically.",
-        ("Check for updates", "Install update"),
+        "Check GitHub Releases and verify explicitly approved downloads.",
+        "Checks use the official repository. Downloads require explicit approval and a GitHub "
+        "SHA-256 asset digest; major updates need separate approval. Hash verification is "
+        "not publisher signing. Installation remains unavailable.",
+        ("Install update",),
     ),
 )
 

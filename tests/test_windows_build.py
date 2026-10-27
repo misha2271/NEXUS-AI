@@ -44,6 +44,8 @@ def report_fixture(appdata, *, previous_profile="Smart"):
         "ui_constructed": True,
         "settings_roundtrip": True,
         "nvml_binding_available": True,
+        "languages_tested": ["ru", "en"],
+        "language_persistence": True,
         "settings_path": str(config / "settings.json"),
         "persistence_probe_path": str(probe),
         "previous_settings": {"profile": previous_profile, "model": ""},
@@ -86,6 +88,10 @@ def test_pyinstaller_configuration_covers_dynamic_and_qt_dependencies(scripts, t
             "PySide6.QtWidgets",
             "pynvml",
             "psutil._psutil_windows",
+            "sqlite3",
+            "ssl",
+            "http.server",
+            "ctypes",
         ):
             position = command.index(dependency)
             assert command[position - 1] == "--hidden-import"
@@ -171,6 +177,7 @@ def test_smoke_environment_removes_python_and_external_qt_paths(scripts, monkeyp
         ({"qt_platform": "offscreen"}, "qt_platform"),
         ({"ui_constructed": False}, "ui_constructed"),
         ({"nvml_binding_available": False}, "nvml_binding_available"),
+        ({"language_persistence": False}, "language_persistence"),
         ({"settings_roundtrip": False}, "settings_roundtrip"),
         ({"status": "failed"}, "status"),
         ({"errors": ["could not import psutil"]}, "reported errors"),
@@ -181,6 +188,14 @@ def test_smoke_rejects_invalid_or_source_mode_reports(scripts, tmp_path, change,
     report = report_fixture(tmp_path)
     report.update(change)
     with pytest.raises(RuntimeError, match=match):
+        smoke.validate_report(report, tmp_path, second_run=False)
+
+
+def test_smoke_rejects_missing_bilingual_executable_validation(scripts, tmp_path):
+    _build, smoke = scripts
+    report = report_fixture(tmp_path)
+    report["languages_tested"] = ["ru"]
+    with pytest.raises(RuntimeError, match="Russian and English"):
         smoke.validate_report(report, tmp_path, second_run=False)
 
 
@@ -259,6 +274,7 @@ def native_build_fixture(build, monkeypatch, tmp_path):
     monkeypatch.setattr(build, "_check_dependencies", lambda: None)
     (tmp_path / "pyproject.toml").write_text('[project]\nversion="0.3.0"\n', encoding="utf-8")
     (tmp_path / "README.md").write_text("Windows instructions", encoding="utf-8")
+    (tmp_path / "README.ru.md").write_text("Инструкция Windows", encoding="utf-8")
 
 
 def emit_pyinstaller_fixture(command, **_kwargs):
@@ -327,6 +343,7 @@ def test_both_builds_must_pass_smoke_before_portable_zip_and_checksums(
     assert "  NEXUS-AI-Portable.zip\n" in checksums
     with zipfile.ZipFile(artifacts[1]) as archive:
         assert "NEXUS-AI/README.md" in archive.namelist()
+        assert archive.read("NEXUS-AI/README.ru.md").decode("utf-8") == "Инструкция Windows"
 
 
 def test_missing_build_dependencies_remove_stale_canonical_outputs(scripts, monkeypatch, tmp_path):
